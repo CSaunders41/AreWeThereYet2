@@ -7,6 +7,7 @@ using ExileCore.Shared.Interfaces;
 using System.Numerics;
 using AreWeThereYet2.Core;
 using AreWeThereYet2.Party;
+using AreWeThereYet2.Movement;
 using AreWeThereYet2.Settings;
 using ImGuiNET;
 
@@ -17,6 +18,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
     private TaskManager? _taskManager;
     private PartyManager? _partyManager;
     private ErrorManager? _errorManager;
+    private MovementManager? _movementManager;
     
     public override bool Initialise()
     {
@@ -26,6 +28,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             _errorManager = new ErrorManager();
             _taskManager = new TaskManager(_errorManager);
             _partyManager = new PartyManager(GameController, _errorManager);
+            _movementManager = new MovementManager(GameController, _taskManager, _partyManager, _errorManager, Settings);
             
             Name = "AreWeThereYet2";
             
@@ -50,6 +53,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             // Update managers
             _taskManager?.Update();
             _partyManager?.Update();
+            _movementManager?.Update();
             
             // Process tasks
             _taskManager?.ProcessNextTask();
@@ -76,7 +80,21 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 {
                     var leader = _partyManager.GetPartyLeader();
                     ImGui.Text($"Leader: {leader?.GetComponent<Player>()?.PlayerName ?? "Auto-detecting..."}");
+                    
+                    // Show distance to leader
+                    var distance = _movementManager?.GetDistanceToLeader();
+                    if (distance.HasValue)
+                    {
+                        ImGui.Text($"Distance to Leader: {distance.Value:F1}");
+                    }
                 }
+            }
+            
+            if (_movementManager != null)
+            {
+                var isFollowing = _movementManager.IsFollowing();
+                var followColor = isFollowing ? new Vector4(0, 1, 0, 1) : new Vector4(0.7f, 0.7f, 0.7f, 1);
+                ImGui.TextColored(followColor, $"Following: {(isFollowing ? "Active" : "Idle")}");
             }
             
             if (_taskManager != null)
@@ -113,6 +131,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
         {
             _taskManager?.Dispose();
             _partyManager?.Dispose();
+            _movementManager?.Dispose();
             _errorManager?.Dispose();
             
             LogMessage("AreWeThereYet2 closed successfully", 3);
