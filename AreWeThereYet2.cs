@@ -4,7 +4,7 @@ using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Interfaces;
-using System.Numerics;
+using SharpDX;
 using AreWeThereYet2.Core;
 using AreWeThereYet2.Party;
 using AreWeThereYet2.Movement;
@@ -93,7 +93,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             if (_movementManager != null)
             {
                 var isFollowing = _movementManager.IsFollowing();
-                var followColor = isFollowing ? new Vector4(0, 1, 0, 1) : new Vector4(0.7f, 0.7f, 0.7f, 1);
+                var followColor = isFollowing ? new System.Numerics.Vector4(0, 1, 0, 1) : new System.Numerics.Vector4(0.7f, 0.7f, 0.7f, 1);
                 ImGui.TextColored(followColor, $"Following: {(isFollowing ? "Active" : "Idle")}");
             }
             

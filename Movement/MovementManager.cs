@@ -1,6 +1,6 @@
 using ExileCore;
 using ExileCore.PoEMemory.MemoryObjects;
-using System.Numerics;
+using SharpDX;
 using AreWeThereYet2.Core;
 using AreWeThereYet2.Party;
 using AreWeThereYet2.Settings;
