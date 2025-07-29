@@ -42,27 +42,27 @@
 
   <ItemGroup>
     <Reference Include="ExileCore">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\ExileCore\ExileCore.dll</HintPath>
+      <HintPath>..\..\..\ExileCore.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="GameOffsets">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\ExileCore\GameOffsets.dll</HintPath>
+      <HintPath>..\..\..\GameOffsets.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Coroutine">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\ExileCore\Coroutine.dll</HintPath>
+      <HintPath>..\..\..\Coroutine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="ImGui.NET">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\ExileCore\ImGui.NET.dll</HintPath>
+      <HintPath>..\..\..\ImGui.NET.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="SharpDX">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\ExileCore\SharpDX.dll</HintPath>
+      <HintPath>..\..\..\SharpDX.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="SharpDX.Mathematics">
-      <HintPath>$(MSBuildProjectDirectory)\..\..\ExileCore\SharpDX.Mathematics.dll</HintPath>
+      <HintPath>..\..\..\SharpDX.Mathematics.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

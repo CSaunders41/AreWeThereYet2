@@ -3,14 +3,16 @@ using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.Shared;
 using ExileCore.Shared.Enums;
+using ExileCore.Shared.Interfaces;
 using System.Numerics;
 using AreWeThereYet2.Core;
 using AreWeThereYet2.Party;
 using AreWeThereYet2.Settings;
+using ImGuiNET;
 
 namespace AreWeThereYet2;
 
-public class AreWeThereYet2 : BasePlugin
+public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
 {
     private TaskManager? _taskManager;
     private PartyManager? _partyManager;
@@ -63,27 +65,40 @@ public class AreWeThereYet2 : BasePlugin
         try
         {
             // Settings will be implemented later
-            ImGuiExtension.Label("AreWeThereYet2 v2.0 - Phase 0 Development");
-            ImGuiExtension.Label("Enhanced follower plugin combining superior pathfinding with comprehensive features");
+            ImGui.Text("AreWeThereYet2 v2.0 - Phase 0 Development");
+            ImGui.Text("Enhanced follower plugin combining superior pathfinding with comprehensive features");
+            ImGui.Separator();
             
             if (_partyManager != null)
             {
-                ImGuiExtension.Label($"Party Status: {(_partyManager.IsInParty() ? "In Party" : "Solo")}");
+                ImGui.Text($"Party Status: {(_partyManager.IsInParty() ? "In Party" : "Solo")}");
                 if (_partyManager.IsInParty())
                 {
                     var leader = _partyManager.GetPartyLeader();
-                    ImGuiExtension.Label($"Leader: {leader?.Name ?? "Auto-detecting..."}");
+                    ImGui.Text($"Leader: {leader?.GetComponent<Player>()?.PlayerName ?? "Auto-detecting..."}");
                 }
             }
             
             if (_taskManager != null)
             {
-                ImGuiExtension.Label($"Active Tasks: {_taskManager.GetActiveTaskCount()}");
+                ImGui.Text($"Active Tasks: {_taskManager.GetActiveTaskCount()}");
             }
             
             if (_errorManager != null)
             {
-                ImGuiExtension.Label($"Error Count: {_errorManager.GetErrorCount()}");
+                ImGui.Text($"Error Count: {_errorManager.GetErrorCount()}");
+            }
+
+            ImGui.Separator();
+            
+            // Basic status information
+            if (GameController?.Game?.IngameState?.InGame == true)
+            {
+                ImGui.TextColored(new System.Numerics.Vector4(0, 1, 0, 1), "Status: In Game");
+            }
+            else
+            {
+                ImGui.TextColored(new System.Numerics.Vector4(1, 1, 0, 1), "Status: Not In Game");
             }
         }
         catch (Exception ex)
