@@ -2,6 +2,7 @@ using ExileCore;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.PoEMemory.Elements;
+using ExileCore.Shared.Enums;
 using AreWeThereYet2.Core;
 
 namespace AreWeThereYet2.Party;
@@ -262,6 +263,7 @@ public class PartyManager : IDisposable
     /// <summary>
     /// Calculate a score for how likely this entity is to be the leader
     /// Higher score = more likely to be leader
+    /// Simplified version to avoid API compatibility issues
     /// </summary>
     private float CalculateLeaderScore(Entity entity)
     {
@@ -271,34 +273,38 @@ public class PartyManager : IDisposable
 
             float score = 0f;
 
-            // Factors that increase leader likelihood:
-            // 1. Higher level (leaders often have higher level characters)
-            var stats = entity.GetComponent<Stats>();
-            if (stats != null)
-            {
-                score += stats.Level * 0.1f;
-            }
-
-            // 2. Further from spawn/town area (leaders move first)
+            // Primary factor: Distance from origin (leaders typically move ahead)
             var pos = entity.Pos;
             if (pos != null)
             {
                 var distanceFromOrigin = Math.Sqrt(pos.X * pos.X + pos.Y * pos.Y);
-                score += (float)distanceFromOrigin * 0.01f;
+                score += (float)distanceFromOrigin * 0.1f;
             }
 
-            // 3. Has movement component and is moving
-            var actor = entity.GetComponent<Actor>();
-            if (actor != null && actor.isMoving)
+            // Secondary factor: Entity has Player component (confirms it's a player)
+            var player = entity.GetComponent<Player>();
+            if (player != null)
             {
-                score += 10f; // Bonus for actively moving
+                score += 5f; // Base score for being a player entity
+                
+                // Bonus if we can safely access player name (indicates healthy entity)
+                try
+                {
+                    if (!string.IsNullOrEmpty(player.PlayerName))
+                    {
+                        score += 2f;
+                    }
+                }
+                catch
+                {
+                    // Player name access failed, skip bonus
+                }
             }
 
-            // 4. Health and mana (leaders often have better gear/higher stats)
-            var life = entity.GetComponent<Life>();
-            if (life != null)
+            // Tertiary factor: Entity is valid and addressable
+            if (entity.IsValid && entity.Address != 0)
             {
-                score += (life.MaxHP + life.MaxES) * 0.001f;
+                score += 1f;
             }
 
             return score;
