@@ -146,7 +146,8 @@ public class PredictiveMovement : IPathfinding
             
             var candidatePoint = currentPos + (direction * stepSize);
             
-            _debugLog($"PREDICTIVE: NextPoint Distance={distance:F1}, StepSize={stepSize:F1}, Target={candidatePoint}");
+            _debugLog($"PREDICTIVE: Distance={distance:F1}, StepSize={stepSize:F1}, Target={candidatePoint}");
+            _debugLog($"PREDICTIVE DEBUG: MinStep={MinStepSize}, StandardStep={StandardStepSize}, AggressiveStep={AggressiveStepSize}");
             
             // USE EXILECORE MEMORY - Check for actual obstacles!
             if (!HasMajorObstacleAt(candidatePoint))
@@ -372,10 +373,26 @@ public class PredictiveMovement : IPathfinding
     /// </summary>
     private float CalculateAggressiveStepSize(float distance)
     {
+        float calculated;
+        
         // Use larger steps for distant targets, but never tiny steps
-        if (distance > 300f) return AggressiveStepSize;  // 180 units for very far
-        if (distance > 150f) return StandardStepSize;    // 120 units for medium
-        return Math.Max(MinStepSize, distance * 0.6f);   // At least 80 units for close
+        if (distance > 300f) 
+        {
+            calculated = AggressiveStepSize;  // 180 units for very far
+            _debugLog($"STEP CALC: Distance {distance:F1} > 300 -> AGGRESSIVE {calculated}");
+        }
+        else if (distance > 150f) 
+        {
+            calculated = StandardStepSize;    // 120 units for medium
+            _debugLog($"STEP CALC: Distance {distance:F1} > 150 -> STANDARD {calculated}");
+        }
+        else 
+        {
+            calculated = Math.Max(MinStepSize, distance * 0.6f);   // At least 80 units for close
+            _debugLog($"STEP CALC: Distance {distance:F1} <= 150 -> MIN({MinStepSize}, {distance * 0.6f:F1}) = {calculated}");
+        }
+        
+        return calculated;
     }
 
     /// <summary>
