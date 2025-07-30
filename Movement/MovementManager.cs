@@ -4,6 +4,8 @@ using SharpDX;
 using AreWeThereYet2.Core;
 using AreWeThereYet2.Party;
 using AreWeThereYet2.Settings;
+using AreWeThereYet2.Movement.Pathfinding;
+using System.Threading.Tasks;
 
 namespace AreWeThereYet2.Movement;
 
@@ -18,6 +20,8 @@ public class MovementManager : IDisposable
     private readonly ErrorManager _errorManager;
     private readonly AreWeThereYet2Settings _settings;
     private readonly Action<string> _debugLog;
+    private readonly IPathfinding _pathfinding;
+    private readonly MovementExecutor _movementExecutor;
     private DateTime _lastMovementCheck;
     private bool _disposed;
 
@@ -41,6 +45,12 @@ public class MovementManager : IDisposable
         _settings = settings;
         _debugLog = debugLog;
         _lastMovementCheck = DateTime.MinValue;
+        
+        // Initialize Phase 2 pathfinding and movement systems
+        _pathfinding = new BasicPathfinding(gameController, debugLog);
+        _movementExecutor = new MovementExecutor(gameController, _pathfinding, debugLog, settings);
+        
+        debugLog("PHASE 2: Real pathfinding and movement systems initialized");
     }
 
     /// <summary>
@@ -209,7 +219,7 @@ public class MovementManager : IDisposable
                 "follow_leader",
                 TaskPriority.Movement,
                 taskDescription,
-                () => ExecuteMovementToPosition(leaderPosition),
+                () => ExecuteMovementToPosition(leaderPosition).GetAwaiter().GetResult(),
                 () => CanExecuteMovement(),
                 TimeSpan.FromSeconds(10), // 10 second timeout
                 maxRetries: 2
@@ -232,39 +242,20 @@ public class MovementManager : IDisposable
     }
 
     /// <summary>
-    /// Execute movement to a specific position
+    /// Execute movement to a specific position using REAL pathfinding and mouse movement
+    /// Phase 2: This now uses actual pathfinding and mouse movement instead of placeholder
     /// </summary>
-    private bool ExecuteMovementToPosition(Vector3 targetPosition)
+    private async Task<bool> ExecuteMovementToPosition(Vector3 targetPosition)
     {
         try
         {
-            var player = _gameController?.Player;
-            if (player == null)
-            {
-                _debugLog("ExecuteMovementToPosition: Player is NULL");
-                return false;
-            }
-
-            var currentPos = player.Pos;
-            var distance = CalculateDistance(currentPos, targetPosition);
-            var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
-
-            _debugLog($"TASK EXECUTING: CurrentDistance={distance:F1}, Threshold={followDistance:F1}");
-
-            // If we're close enough, consider the task complete
-            if (distance <= followDistance)
-            {
-                _debugLog($"TASK SUCCESS: Close enough! {distance:F1} <= {followDistance:F1}");
-                return true;
-            }
-
-            // TODO: In Phase 2, we'll integrate with AreWeThereYet's pathfinding
-            // For now, we'll use basic mouse movement simulation
-            bool moveResult = ExecuteBasicMovement(targetPosition);
+            _debugLog("PHASE 2: Executing REAL movement with pathfinding");
             
-            _debugLog($"TASK MOVEMENT: ExecuteBasicMovement returned {moveResult}");
-                
-            return moveResult;
+            // Use the new MovementExecutor for real pathfinding and mouse movement
+            var result = await _movementExecutor.ExecuteMovementToPosition(targetPosition);
+            
+            _debugLog($"REAL MOVEMENT RESULT: {result}");
+            return result;
         }
         catch (Exception ex)
         {
@@ -376,8 +367,19 @@ public class MovementManager : IDisposable
     {
         if (_disposed) return;
 
-        // Cancel any active movement tasks
-        _taskManager?.RemoveTask("follow_leader");
+        try
+        {
+            // Cancel any active movement tasks
+            _taskManager?.RemoveTask("follow_leader");
+            
+            // Dispose Phase 2 movement systems
+            _movementExecutor?.Dispose();
+            _debugLog("PHASE 2: Movement systems disposed");
+        }
+        catch (Exception ex)
+        {
+            _errorManager?.HandleError("MovementManager.Dispose", ex);
+        }
         
         _disposed = true;
     }
