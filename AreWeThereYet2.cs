@@ -58,8 +58,9 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             _partyManager?.Update();
             _movementManager?.Update();
             
-            // Simple debug output every 60 frames (~1 second)
-            if (GameController.Game.IngameState.TimeInGame % 60 == 0)
+            // Simple debug output every ~1 second (using milliseconds)
+            var timeMs = (long)GameController.Game.IngameState.TimeInGame.TotalMilliseconds;
+            if (timeMs % 1000 < 50) // Show debug roughly every second (within 50ms window)
             {
                 var player = GameController?.Player;
                 var leader = _partyManager?.GetPartyLeader();
