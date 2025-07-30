@@ -144,7 +144,13 @@ public class MovementManager : IDisposable
             // Get follow distance from settings (lower default for testing)
             var followDistance = _settings?.MaxFollowDistance?.Value ?? 30f; // Lower default for testing
 
-            // Debug info
+            // ENHANCED DEBUG INFO - to diagnose leader selection issue
+            var playerName = player.GetComponent<Player>()?.PlayerName ?? "Unknown";
+            var leaderName = leader.GetComponent<Player>()?.PlayerName ?? "Unknown";
+            var isPlayerSameAsLeader = (player == leader);
+            var isPlayerPosVsLeaderPos = (playerPos.Equals(leaderPos));
+            
+            _debugLog($"ENTITIES: Player='{playerName}' vs Leader='{leaderName}' | SameEntity={isPlayerSameAsLeader} | SamePos={isPlayerPosVsLeaderPos}");
             _debugLog($"Distance: {distance:F1}, Threshold: {followDistance:F1}, PlayerPos: {playerPos}, LeaderPos: {leaderPos}");
 
             // Simple follow logic - no complex task system

@@ -112,11 +112,44 @@ public class PartyManager : IDisposable
     /// </summary>
     public Entity? GetPartyLeader()
     {
-        // FIXED: Manual leader always takes priority if set
-        if (_manualLeader != null && _manualLeader.IsValid)
-            return _manualLeader;
+        try
+        {
+            var currentPlayer = _gameController?.Player;
             
-        return _currentLeader;
+            // FIXED: Manual leader always takes priority if set
+            if (_manualLeader != null && _manualLeader.IsValid)
+            {
+                var manualName = _manualLeader.GetComponent<Player>()?.PlayerName ?? "Unknown";
+                var isPlayerOwnEntity = (_manualLeader == currentPlayer);
+                if (isPlayerOwnEntity)
+                {
+                    // ERROR: Manual leader is player's own entity! Clear it.
+                    _manualLeader = null;
+                    return _currentLeader;
+                }
+                return _manualLeader;
+            }
+            
+            // Check auto-detected leader
+            if (_currentLeader != null && _currentLeader.IsValid)
+            {
+                var autoName = _currentLeader.GetComponent<Player>()?.PlayerName ?? "Unknown";
+                var isPlayerOwnEntity = (_currentLeader == currentPlayer);
+                if (isPlayerOwnEntity)
+                {
+                    // ERROR: Auto leader is player's own entity! Clear it.
+                    _currentLeader = null;
+                    return null;
+                }
+            }
+            
+            return _currentLeader;
+        }
+        catch (Exception ex)
+        {
+            _errorManager.HandleError("PartyManager.GetPartyLeader", ex);
+            return null;
+        }
     }
 
     /// <summary>
@@ -322,13 +355,6 @@ public class PartyManager : IDisposable
                     // Check if entity has a valid player component
                     var playerComponent = entity.GetComponent<Player>();
                     if (playerComponent?.PlayerName == null) continue;
-
-                    // ADDITIONAL SAFETY: Double-check this isn't the current player's entity
-                    // This prevents any edge cases where entity == player check might fail
-                    if (playerComponent.PlayerName.Equals(player.GetComponent<Player>()?.PlayerName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue; // Skip player's own character
-                    }
 
                     // Add to nearby players list (we'll filter by distance if needed)
                     var distance = GetDistanceBetweenEntities(player, entity);
