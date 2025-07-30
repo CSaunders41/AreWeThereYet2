@@ -201,6 +201,23 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             
             ImGui.Separator();
             
+            // AUTOMATIC SETTINGS RENDERING - this will show all the settings including HotkeyNode
+            ImGui.PushStyleColor(Text, new System.Numerics.Vector4(1, 0.8f, 0.2f, 1)); // Orange text
+            ImGui.Text("⚙️ Plugin Settings:");
+            ImGui.PopStyleColor();
+            
+            // Call base DrawSettings to render all the automatic settings (including HotkeyNode)
+            try
+            {
+                base.DrawSettings();
+            }
+            catch (Exception ex)
+            {
+                ImGui.Text($"Settings error: {ex.Message}");
+            }
+            
+            ImGui.Separator();
+            
             // Follow Toggle Button (prominent placement)
             if (Settings?.EnableFollowing != null)
             {
