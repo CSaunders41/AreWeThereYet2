@@ -79,6 +79,26 @@ var player = entity.GetComponent<Player>();
 - ❌ **Limited community knowledge** about proper obstacle detection
 - ✅ **General movement principles** from other game bots show similar patterns
 
+### Original AreWeThereYet Behavior Analysis (User Observation)
+
+**CRITICAL INSIGHT**: User reports that original AreWeThereYet has different behavior:
+- **Mouse hovers over leader** when leader is within range
+- **Clicks directly on leader's position** constantly 
+- **Path updates in real-time** as leader moves
+- **No intermediate waypoint calculation** - just direct leader clicking
+
+**This explains the "confident" movement**:
+- ✅ **Immediate response** to leader movement (no prediction lag)
+- ✅ **No stuck waypoints** (always targeting current leader position)  
+- ✅ **Natural following** (mouse literally follows the leader)
+- ✅ **Constant updates** (not calculating complex paths)
+
+**Our Current Approach vs Original**:
+- ❌ **We calculate intermediate waypoints** → introduces complexity
+- ❌ **We predict leader positions** → can be wrong
+- ❌ **We use fixed step sizes** → not leader-responsive
+- ✅ **Original clicks directly on leader** → simple and effective
+
 ### Current System Diagnostic Issues
 
 #### 1. **Step Size Problems (High Priority)**
@@ -157,7 +177,36 @@ public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
     
     return nextPoint;
 }
-```  
+```
+
+#### **Experiment 5: Direct Leader Clicking** (NEW - Based on User Observation)
+**KEY INSIGHT**: Original AreWeThereYet hovers mouse over leader and clicks directly on their position, constantly updating path.
+
+```csharp
+// Emulate original AreWeThereYet's direct leader clicking behavior
+public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
+{
+    var distance = Vector3.Distance(currentPos, targetPos);
+    
+    // CRITICAL INSIGHT: Within certain range, click DIRECTLY on leader position
+    if (distance <= 200f) // Within "hover range"
+    {
+        _debugLog($"DIRECT LEADER CLICK: Distance {distance:F1} - clicking directly on leader");
+        return targetPos; // Click exactly on leader, no intermediate calculation!
+    }
+    
+    // For distant leaders, take large steps toward them
+    var direction = Vector3.Normalize(targetPos - currentPos);
+    var stepSize = Math.Min(150f, distance); // Large steps
+    return currentPos + (direction * stepSize);
+}
+```
+
+**Research Notes:**
+- Original behavior: **Mouse hovers over leader** when in range
+- **Constantly clicking leader's current position** → immediate path updates
+- **No intermediate waypoint calculation** → more responsive following
+- **Direct position targeting** → reduces stuck scenarios from waypoint miscalculation  
 ✅ **Entity type filtering (Monster, Player, etc.)**
 
 ---
