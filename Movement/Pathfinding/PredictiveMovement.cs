@@ -148,32 +148,73 @@ public class PredictiveMovement : IPathfinding
             
             _debugLog($"PREDICTIVE: NextPoint Distance={distance:F1}, StepSize={stepSize:F1}, Target={candidatePoint}");
             
-            // Simple safety check - minimal overhead
-            if (IsBasicallySafe(candidatePoint))
+            // USE EXILECORE MEMORY - Check for actual obstacles!
+            if (!HasMajorObstacleAt(candidatePoint))
             {
                 return candidatePoint;
             }
             
-            // Simple obstacle avoidance - try left/right angles
-            var leftPoint = currentPos + (RotateVector2D(direction, AvoidanceAngle) * stepSize);
-            if (IsBasicallySafe(leftPoint))
+            _debugLog($"PREDICTIVE: Direct path blocked, trying avoidance angles");
+            
+            // SMART CORNER NAVIGATION - Try multiple angles to get around obstacles
+            float[] avoidanceAngles = { 30f, -30f, 45f, -45f, 60f, -60f, 90f, -90f };
+            
+            foreach (var angle in avoidanceAngles)
             {
-                _debugLog($"PREDICTIVE: Using left avoidance angle");
-                return leftPoint;
+                var avoidancePoint = currentPos + (RotateVector2D(direction, angle) * stepSize);
+                if (!HasMajorObstacleAt(avoidancePoint))
+                {
+                    _debugLog($"PREDICTIVE: Using {angle}° avoidance angle");
+                    return avoidancePoint;
+                }
             }
             
-            var rightPoint = currentPos + (RotateVector2D(direction, -AvoidanceAngle) * stepSize);
-            if (IsBasicallySafe(rightPoint))
+            // CORNER NAVIGATION FALLBACK - Try shorter steps with wider angles
+            var shorterStep = stepSize * 0.6f;
+            foreach (var angle in avoidanceAngles)
             {
-                _debugLog($"PREDICTIVE: Using right avoidance angle");
-                return rightPoint;
+                var avoidancePoint = currentPos + (RotateVector2D(direction, angle) * shorterStep);
+                if (!HasMajorObstacleAt(avoidancePoint))
+                {
+                    _debugLog($"PREDICTIVE: Using shorter step with {angle}° avoidance");
+                    return avoidancePoint;
+                }
             }
             
-            // Last resort: still use a decent sized step (minimum 80 units)
-            var safeStepSize = Math.Max(MinStepSize, stepSize * 0.7f);
-            var fallbackPoint = currentPos + (direction * safeStepSize);
-            _debugLog($"PREDICTIVE: Fallback step size {safeStepSize:F1}");
-            return fallbackPoint;
+            // FINAL FALLBACK STRATEGIES - Don't get stuck!
+            _debugLog($"PREDICTIVE: All avoidance angles blocked, trying fallback strategies");
+            
+            // Strategy 1: Try backward movement to get unstuck
+            var backwardStep = MinStepSize * 0.5f;
+            var backwardPoint = currentPos + (direction * -backwardStep);
+            if (!HasMajorObstacleAt(backwardPoint))
+            {
+                _debugLog($"PREDICTIVE: Using backward unstuck movement");
+                return backwardPoint;
+            }
+            
+            // Strategy 2: Try perpendicular movement (sideways slide)
+            var perpendicularDir = RotateVector2D(direction, 90f);
+            var sideStep = MinStepSize * 0.8f;
+            var leftSlide = currentPos + (perpendicularDir * sideStep);
+            var rightSlide = currentPos + (perpendicularDir * -sideStep);
+            
+            if (!HasMajorObstacleAt(leftSlide))
+            {
+                _debugLog($"PREDICTIVE: Using left slide movement");
+                return leftSlide;
+            }
+            if (!HasMajorObstacleAt(rightSlide))
+            {
+                _debugLog($"PREDICTIVE: Using right slide movement");
+                return rightSlide;
+            }
+            
+            // Strategy 3: Micro-step forward (very small movement to avoid total stuck)
+            var microStep = Math.Min(MinStepSize * 0.3f, 25f);
+            var microPoint = currentPos + (direction * microStep);
+            _debugLog($"PREDICTIVE: Emergency micro-step {microStep:F1} units");
+            return microPoint;
         }
         catch (Exception ex)
         {
