@@ -153,11 +153,43 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Advanced walkability check with 6-level terrain detection
+    /// Advanced walkability check - simplified for Phase 2.1 to prevent pathfinding issues
     /// </summary>
     public bool IsWalkable(Vector3 position)
     {
-        return GetTerrainType(position) == TerrainType.Walkable;
+        try
+        {
+            var player = _gameController?.Player;
+            if (player == null)
+                return false;
+
+            var currentPos = player.Pos;
+            var distance = Vector3.Distance(currentPos, position);
+            
+            // Very basic checks to avoid obvious bad positions
+            // Distance check - don't try to walk too far at once
+            if (distance > 1000f)
+            {
+                _debugLog($"IsWalkable: Position too far ({distance:F1} units)");
+                return false;
+            }
+            
+            // Height difference check - avoid major elevation changes
+            var heightDiff = Math.Abs(position.Z - currentPos.Z);
+            if (heightDiff > 100f)
+            {
+                _debugLog($"IsWalkable: Height difference too large ({heightDiff:F1} units)");
+                return false;
+            }
+            
+            // For Phase 2.1, assume most positions are walkable to prevent movement issues
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"IsWalkable error: {ex.Message}");
+            return true; // Assume walkable on error to avoid getting stuck
+        }
     }
 
     /// <summary>
@@ -186,31 +218,30 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Perform raycast line-of-sight check with obstacle detection
+    /// Perform raycast line-of-sight check - simplified for Phase 2.1 to prevent pathfinding issues
     /// </summary>
     private bool IsDirectLineOfSightClear(Vector3 start, Vector3 target)
     {
         try
         {
             var distance = Vector3.Distance(start, target);
-            var steps = (int)Math.Ceiling(distance / RaycastStep);
+            
+            // Simple distance check - if too far, probably not direct
+            if (distance > MaxDirectPathDistance)
+                return false;
+
+            // For Phase 2.1, use basic walkability checks instead of complex terrain analysis
+            // Check a few points along the line instead of intensive raycast
+            var steps = Math.Max(3, (int)(distance / 100)); // Check every ~100 units
             
             for (int i = 1; i < steps; i++)
             {
                 var t = (float)i / steps;
                 var checkPoint = Vector3.Lerp(start, target, t);
                 
-                var terrainType = GetTerrainType(checkPoint);
-                if (terrainType != TerrainType.Walkable && terrainType != TerrainType.Door)
+                if (!IsWalkable(checkPoint))
                 {
-                    _debugLog($"ADVANCED: Line-of-sight blocked at {checkPoint} by {terrainType}");
-                    return false;
-                }
-                
-                // Check for dynamic obstacles (monsters, players)
-                if (HasDynamicObstacle(checkPoint))
-                {
-                    _debugLog($"ADVANCED: Dynamic obstacle detected at {checkPoint}");
+                    _debugLog($"ADVANCED: Line-of-sight blocked at {checkPoint}");
                     return false;
                 }
             }
@@ -485,12 +516,11 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Check if position is safe for movement
+    /// Check if position is safe for movement - simplified for Phase 2.1
     /// </summary>
     private bool IsPositionSafe(Vector3 position)
     {
-        var terrainType = GetTerrainType(position);
-        return terrainType == TerrainType.Walkable || terrainType == TerrainType.Door;
+        return IsWalkable(position);
     }
 
     /// <summary>
