@@ -28,7 +28,7 @@ public class AreWeThereYet2Settings : ISettings
     public RangeNode<int> LeaderUpdateInterval { get; set; } = new RangeNode<int>(1000, 500, 5000);
 
     [Menu("Max Follow Distance")]
-    public RangeNode<float> MaxFollowDistance { get; set; } = new RangeNode<float>(100f, 10f, 500f);
+    public RangeNode<float> MaxFollowDistance { get; set; } = new RangeNode<float>(30f, 10f, 500f);
 
     [Menu("Task Management", "Task priority and execution settings")]
     public EmptyNode TaskHeader { get; set; } = new EmptyNode();

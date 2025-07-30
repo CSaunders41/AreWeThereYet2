@@ -102,7 +102,7 @@ public class MovementManager : IDisposable
     }
 
     /// <summary>
-    /// Process following the party leader
+    /// Process following the party leader (simplified approach like original AreWeThereYet)
     /// </summary>
     private void ProcessLeaderFollowing()
     {
@@ -113,13 +113,15 @@ public class MovementManager : IDisposable
 
             if (player == null)
             {
-                // Debug: Player is null
+                // Force debug message
+                _errorManager.HandleError("MovementManager.Debug", new Exception("Player is NULL"));
                 return;
             }
 
             if (leader == null)
             {
-                // Debug: Leader is null
+                // Force debug message  
+                _errorManager.HandleError("MovementManager.Debug", new Exception("Leader is NULL"));
                 return;
             }
 
@@ -128,13 +130,20 @@ public class MovementManager : IDisposable
             var leaderPos = leader.Pos;
             var distance = CalculateDistance(playerPos, leaderPos);
 
-            // Get follow distance from settings
-            var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
+            // Get follow distance from settings (lower default for testing)
+            var followDistance = _settings?.MaxFollowDistance?.Value ?? 30f; // Lower default for testing
 
-            // Debug logging - this will show up in error manager if something goes wrong
+            // Force debug info
+            _errorManager.HandleError("MovementManager.Debug", 
+                new Exception($"Distance: {distance:F1}, Threshold: {followDistance:F1}, PlayerPos: {playerPos}, LeaderPos: {leaderPos}"));
+
+            // Simple follow logic - no complex task system
             if (distance > followDistance)
             {
-                // We should create a follow task here
+                // DIRECTLY try to create a simple follow task
+                _errorManager.HandleError("MovementManager.Debug", 
+                    new Exception($"Should follow! Distance {distance:F1} > {followDistance:F1}"));
+                    
                 CreateFollowTask(leaderPos, distance);
             }
             else
@@ -143,6 +152,8 @@ public class MovementManager : IDisposable
                 if (_taskManager.HasTask("follow_leader"))
                 {
                     _taskManager.RemoveTask("follow_leader");
+                    _errorManager.HandleError("MovementManager.Debug", 
+                        new Exception("Removed follow task - close enough"));
                 }
             }
         }

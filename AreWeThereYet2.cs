@@ -58,6 +58,17 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             _partyManager?.Update();
             _movementManager?.Update();
             
+            // Simple debug output every 60 frames (~1 second)
+            if (GameController.Game.IngameState.TimeInGame % 60 == 0)
+            {
+                var player = GameController?.Player;
+                var leader = _partyManager?.GetPartyLeader();
+                
+                LogMessage($"DEBUG: Player={player != null}, Leader={leader != null}, " +
+                          $"EnableFollowing={Settings?.EnableFollowing?.Value}, " +
+                          $"PlayerPos={player?.Pos}, LeaderPos={leader?.Pos}");
+            }
+            
             // Sync manual leader setting
             SyncManualLeaderSetting();
             
