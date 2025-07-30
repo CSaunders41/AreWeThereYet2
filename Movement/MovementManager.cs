@@ -46,11 +46,11 @@ public class MovementManager : IDisposable
         _debugLog = debugLog;
         _lastMovementCheck = DateTime.MinValue;
         
-        // Initialize Phase 2 pathfinding and movement systems
-        _pathfinding = new BasicPathfinding(gameController, debugLog);
+        // Initialize Phase 2.1 Advanced LineOfSight pathfinding and movement systems
+        _pathfinding = new AdvancedLineOfSight(gameController, debugLog);
         _movementExecutor = new MovementExecutor(gameController, _pathfinding, debugLog, settings);
         
-        debugLog("PHASE 2: Real pathfinding and movement systems initialized");
+        debugLog("PHASE 2.1: Advanced LineOfSight pathfinding and movement systems initialized");
     }
 
     /// <summary>
@@ -242,19 +242,19 @@ public class MovementManager : IDisposable
     }
 
     /// <summary>
-    /// Execute movement to a specific position using REAL pathfinding and mouse movement
-    /// Phase 2: This now uses actual pathfinding and mouse movement instead of placeholder
+    /// Execute movement to a specific position using ADVANCED LineOfSight pathfinding and mouse movement
+    /// Phase 2.1: This now uses advanced terrain detection, raycast pathfinding, and intelligent obstacle avoidance
     /// </summary>
     private async Task<bool> ExecuteMovementToPosition(Vector3 targetPosition)
     {
         try
         {
-            _debugLog("PHASE 2: Executing REAL movement with pathfinding");
+            _debugLog("PHASE 2.1: Executing ADVANCED movement with LineOfSight pathfinding");
             
-            // Use the new MovementExecutor for real pathfinding and mouse movement
+            // Use the new MovementExecutor with AdvancedLineOfSight for superior pathfinding
             var result = await _movementExecutor.ExecuteMovementToPosition(targetPosition);
             
-            _debugLog($"REAL MOVEMENT RESULT: {result}");
+            _debugLog($"ADVANCED MOVEMENT RESULT: {result}");
             return result;
         }
         catch (Exception ex)
@@ -372,9 +372,9 @@ public class MovementManager : IDisposable
             // Cancel any active movement tasks
             _taskManager?.RemoveTask("follow_leader");
             
-            // Dispose Phase 2 movement systems
+            // Dispose Phase 2.1 Advanced LineOfSight movement systems
             _movementExecutor?.Dispose();
-            _debugLog("PHASE 2: Movement systems disposed");
+            _debugLog("PHASE 2.1: Advanced LineOfSight movement systems disposed");
         }
         catch (Exception ex)
         {
