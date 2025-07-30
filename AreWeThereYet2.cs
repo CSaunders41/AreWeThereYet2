@@ -193,8 +193,9 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             {
                 var hotkeyName = Settings.FollowToggleHotkey.Value.ToString();
                 ImGui.PushStyleColor(Text, new System.Numerics.Vector4(1, 1, 0, 1)); // Yellow text
-                ImGui.Text($"🔑 EMERGENCY HOTKEY: Press {hotkeyName} to toggle following ON/OFF");
+                ImGui.Text($"🔑 EMERGENCY HOTKEY: Press '{hotkeyName}' to toggle following ON/OFF");
                 ImGui.Text("   ⚠️  Essential when bot controls your mouse!");
+                ImGui.Text($"   📝 Don't like '{hotkeyName}'? Click the hotkey setting below to change it!");
                 ImGui.PopStyleColor();
             }
             
