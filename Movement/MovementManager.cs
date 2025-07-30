@@ -142,9 +142,22 @@ public class MovementManager : IDisposable
             {
                 // DIRECTLY try to create a simple follow task
                 _errorManager.HandleError("MovementManager.Debug", 
-                    new Exception($"Should follow! Distance {distance:F1} > {followDistance:F1}"));
+                    new Exception($"SHOULD CREATE TASK! Distance {distance:F1} > {followDistance:F1}"));
+                
+                // Check if we can actually create the task
+                bool canMove = CanExecuteMovement();
+                bool isReady = IsReadyForMovement();
+                
+                _errorManager.HandleError("MovementManager.Debug", 
+                    new Exception($"CanExecuteMovement={canMove}, IsReadyForMovement={isReady}"));
                     
                 CreateFollowTask(leaderPos, distance);
+                
+                // Verify task was actually added
+                bool hasTask = _taskManager.HasTask("follow_leader");
+                int taskCount = _taskManager.GetActiveTaskCount();
+                _errorManager.HandleError("MovementManager.Debug", 
+                    new Exception($"After CreateFollowTask: HasTask={hasTask}, TaskCount={taskCount}"));
             }
             else
             {
