@@ -12,6 +12,7 @@ using AreWeThereYet2.Settings;
 using ImGuiNET;
 using static ImGuiNET.ImGuiCond;
 using static ImGuiNET.ImGuiWindowFlags;
+using static ImGuiNET.ImGuiCol;
 
 namespace AreWeThereYet2;
 
@@ -81,12 +82,27 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             ImGui.Text("Enhanced follower plugin combining superior pathfinding with comprehensive features");
             ImGui.Separator();
             
-            // Follow Toggle (prominent placement)
+            // Follow Toggle Button (prominent placement)
             if (Settings?.EnableFollowing != null)
             {
                 var isFollowing = Settings.EnableFollowing.Value;
                 var followColor = isFollowing ? new System.Numerics.Vector4(0, 1, 0, 1) : new System.Numerics.Vector4(1, 0.5f, 0, 1);
-                ImGui.TextColored(followColor, $"Following: {(isFollowing ? "ENABLED" : "DISABLED")}");
+                
+                // Large, prominent toggle button
+                ImGui.PushStyleColor(Text, followColor);
+                if (ImGui.Button($"Following: {(isFollowing ? "ENABLED" : "DISABLED")}##FollowToggle", new System.Numerics.Vector2(200, 30)))
+                {
+                    Settings.EnableFollowing.Value = !Settings.EnableFollowing.Value;
+                }
+                ImGui.PopStyleColor();
+                
+                // Alternative checkbox version (smaller)
+                ImGui.SameLine();
+                bool enableFollowing = Settings.EnableFollowing.Value;
+                if (ImGui.Checkbox("##EnableFollowingCheck", ref enableFollowing))
+                {
+                    Settings.EnableFollowing.Value = enableFollowing;
+                }
             }
             
             ImGui.Separator();
