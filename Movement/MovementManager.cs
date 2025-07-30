@@ -17,6 +17,7 @@ public class MovementManager : IDisposable
     private readonly PartyManager _partyManager;
     private readonly ErrorManager _errorManager;
     private readonly AreWeThereYet2Settings _settings;
+    private readonly Action<string> _debugLog;
     private DateTime _lastMovementCheck;
     private bool _disposed;
 
@@ -30,13 +31,15 @@ public class MovementManager : IDisposable
         TaskManager taskManager,
         PartyManager partyManager,
         ErrorManager errorManager,
-        AreWeThereYet2Settings settings)
+        AreWeThereYet2Settings settings,
+        Action<string> debugLog)
     {
         _gameController = gameController;
         _taskManager = taskManager;
         _partyManager = partyManager;
         _errorManager = errorManager;
         _settings = settings;
+        _debugLog = debugLog;
         _lastMovementCheck = DateTime.MinValue;
     }
 
@@ -113,15 +116,13 @@ public class MovementManager : IDisposable
 
             if (player == null)
             {
-                // Force debug message
-                _errorManager.HandleError("MovementManager.Debug", new Exception("Player is NULL"));
+                _debugLog("Player is NULL");
                 return;
             }
 
             if (leader == null)
             {
-                // Force debug message  
-                _errorManager.HandleError("MovementManager.Debug", new Exception("Leader is NULL"));
+                _debugLog("Leader is NULL");
                 return;
             }
 
@@ -133,9 +134,8 @@ public class MovementManager : IDisposable
             // Get follow distance from settings (lower default for testing)
             var followDistance = _settings?.MaxFollowDistance?.Value ?? 30f; // Lower default for testing
 
-            // Force debug info
-            _errorManager.HandleError("MovementManager.Debug", 
-                new Exception($"Distance: {distance:F1}, Threshold: {followDistance:F1}, PlayerPos: {playerPos}, LeaderPos: {leaderPos}"));
+            // Debug info
+            _debugLog($"Distance: {distance:F1}, Threshold: {followDistance:F1}, PlayerPos: {playerPos}, LeaderPos: {leaderPos}");
 
             // Simple follow logic - no complex task system
             if (distance > followDistance)
@@ -145,30 +145,26 @@ public class MovementManager : IDisposable
                 
                 if (!hasTaskBefore)
                 {
-                    _errorManager.HandleError("MovementManager.Debug", 
-                        new Exception($"CREATING NEW TASK! Distance {distance:F1} > {followDistance:F1}"));
+                    _debugLog($"CREATING NEW TASK! Distance {distance:F1} > {followDistance:F1}");
                     
                     // Check if we can actually create the task
                     bool canMove = CanExecuteMovement();
                     bool isReady = IsReadyForMovement();
                     
-                    _errorManager.HandleError("MovementManager.Debug", 
-                        new Exception($"CanExecuteMovement={canMove}, IsReadyForMovement={isReady}"));
+                    _debugLog($"CanExecuteMovement={canMove}, IsReadyForMovement={isReady}");
                         
                     CreateFollowTask(leaderPos, distance);
                     
                     // Verify task was actually added
                     bool hasTaskAfter = _taskManager.HasTask("follow_leader");
                     int taskCount = _taskManager.GetActiveTaskCount();
-                    _errorManager.HandleError("MovementManager.Debug", 
-                        new Exception($"After CreateFollowTask: HasTask={hasTaskAfter}, TaskCount={taskCount}"));
+                    _debugLog($"After CreateFollowTask: HasTask={hasTaskAfter}, TaskCount={taskCount}");
                 }
                 else
                 {
                     // Task already exists - check its status
                     var currentTask = _taskManager.GetCurrentTask();
-                    _errorManager.HandleError("MovementManager.Debug", 
-                        new Exception($"TASK EXISTS: Current={currentTask?.Description ?? "None"}, Status={currentTask?.Status.ToString() ?? "None"}"));
+                    _debugLog($"TASK EXISTS: Current={currentTask?.Description ?? "None"}, Status={currentTask?.Status.ToString() ?? "None"}");
                 }
             }
             else
@@ -177,8 +173,7 @@ public class MovementManager : IDisposable
                 if (_taskManager.HasTask("follow_leader"))
                 {
                     _taskManager.RemoveTask("follow_leader");
-                    _errorManager.HandleError("MovementManager.Debug", 
-                        new Exception("Removed follow task - close enough"));
+                    _debugLog("Removed follow task - close enough");
                 }
             }
         }
@@ -208,9 +203,7 @@ public class MovementManager : IDisposable
             // Log task creation attempt
             var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
             
-            // Force an error to see this in the debug info
-            _errorManager.HandleError("MovementManager.Debug", 
-                new Exception($"Creating follow task: distance={currentDistance:F1}, threshold={followDistance:F1}"));
+            _debugLog($"Creating follow task: distance={currentDistance:F1}, threshold={followDistance:F1}");
             
             _taskManager.AddTask(
                 "follow_leader",
@@ -225,13 +218,11 @@ public class MovementManager : IDisposable
             // Verify task was created
             if (_taskManager.HasTask("follow_leader"))
             {
-                _errorManager.HandleError("MovementManager.Debug", 
-                    new Exception("Follow task created successfully"));
+                _debugLog("Follow task created successfully");
             }
             else
             {
-                _errorManager.HandleError("MovementManager.Debug", 
-                    new Exception("Follow task creation FAILED"));
+                _debugLog("Follow task creation FAILED");
             }
         }
         catch (Exception ex)
@@ -250,7 +241,7 @@ public class MovementManager : IDisposable
             var player = _gameController?.Player;
             if (player == null)
             {
-                _errorManager.HandleError("MovementManager.Debug", new Exception("ExecuteMovementToPosition: Player is NULL"));
+                _debugLog("ExecuteMovementToPosition: Player is NULL");
                 return false;
             }
 
@@ -258,14 +249,12 @@ public class MovementManager : IDisposable
             var distance = CalculateDistance(currentPos, targetPosition);
             var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
 
-            _errorManager.HandleError("MovementManager.Debug", 
-                new Exception($"TASK EXECUTING: CurrentDistance={distance:F1}, Threshold={followDistance:F1}"));
+            _debugLog($"TASK EXECUTING: CurrentDistance={distance:F1}, Threshold={followDistance:F1}");
 
             // If we're close enough, consider the task complete
             if (distance <= followDistance)
             {
-                _errorManager.HandleError("MovementManager.Debug", 
-                    new Exception($"TASK SUCCESS: Close enough! {distance:F1} <= {followDistance:F1}"));
+                _debugLog($"TASK SUCCESS: Close enough! {distance:F1} <= {followDistance:F1}");
                 return true;
             }
 
@@ -273,8 +262,7 @@ public class MovementManager : IDisposable
             // For now, we'll use basic mouse movement simulation
             bool moveResult = ExecuteBasicMovement(targetPosition);
             
-            _errorManager.HandleError("MovementManager.Debug", 
-                new Exception($"TASK MOVEMENT: ExecuteBasicMovement returned {moveResult}"));
+            _debugLog($"TASK MOVEMENT: ExecuteBasicMovement returned {moveResult}");
                 
             return moveResult;
         }
@@ -301,8 +289,7 @@ public class MovementManager : IDisposable
             var currentPos = player.Pos;
             var distance = CalculateDistance(currentPos, targetPosition);
             
-            _errorManager.HandleError("MovementManager.Debug", 
-                new Exception($"BASIC MOVEMENT: Distance={distance:F1}, Target={targetPosition}"));
+            _debugLog($"BASIC MOVEMENT: Distance={distance:F1}, Target={targetPosition}");
             
             // TEMPORARY FIX FOR THRASHING: Return false to keep task "in progress"
             // This prevents the rapid create->complete->create cycle

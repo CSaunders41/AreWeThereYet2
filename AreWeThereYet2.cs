@@ -22,6 +22,8 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
     private PartyManager? _partyManager;
     private ErrorManager? _errorManager;
     private MovementManager? _movementManager;
+    private List<string> _debugLog = new List<string>();
+    private readonly int _maxDebugLogLines = 100;
     
     public override bool Initialise()
     {
@@ -31,17 +33,50 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             _errorManager = new ErrorManager();
             _taskManager = new TaskManager(_errorManager);
             _partyManager = new PartyManager(GameController, _errorManager);
-            _movementManager = new MovementManager(GameController, _taskManager, _partyManager, _errorManager, Settings);
+            _movementManager = new MovementManager(GameController, _taskManager, _partyManager, _errorManager, Settings, DebugLog);
             
             Name = "AreWeThereYet2";
             
             LogMessage("AreWeThereYet2 v2.0 initialized successfully", 3);
+            DebugLog("Plugin initialized successfully");
             return true;
         }
         catch (Exception ex)
         {
             LogError($"Failed to initialize AreWeThereYet2: {ex.Message}", 3);
+            DebugLog($"INIT ERROR: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Add debug message to persistent log and ExileCore log
+    /// </summary>
+    private void DebugLog(string message)
+    {
+        try
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+            var logEntry = $"[{timestamp}] {message}";
+            
+            // Add to in-memory debug log
+            _debugLog.Add(logEntry);
+            
+            // Keep log size manageable
+            if (_debugLog.Count > _maxDebugLogLines)
+            {
+                _debugLog.RemoveAt(0);
+            }
+            
+            // Also log to ExileCore's logging system (more persistent)
+            if (Settings?.DebugMode?.Value == true)
+            {
+                LogMessage($"[DEBUG] {message}", 1);
+            }
+        }
+        catch
+        {
+            // Don't crash if logging fails
         }
     }
 
@@ -58,7 +93,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             _partyManager?.Update();
             _movementManager?.Update();
             
-            // Simple debug output every ~1 second (using milliseconds)
+            // Debug output every ~1 second (using milliseconds)
             var timeMs = (long)GameController.Game.IngameState.TimeInGame.TotalMilliseconds;
             if (timeMs % 1000 < 50) // Show debug roughly every second (within 50ms window)
             {
@@ -70,10 +105,13 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 var leaderName = leader?.GetComponent<Player>()?.PlayerName ?? "Unknown";
                 var manualLeaderName = Settings?.ManualLeaderName?.Value ?? "";
                 
-                LogMessage($"DEBUG: Player={player != null}({playerName}), Leader={leader != null}({leaderName}), " +
-                          $"ManualLeader='{manualLeaderName}', EnableFollowing={Settings?.EnableFollowing?.Value}, " +
-                          $"PlayerPos={player?.Pos}, LeaderPos={leader?.Pos}, " +
-                          $"SameEntity={player == leader}");
+                var distance = _movementManager?.GetDistanceToLeader() ?? 0f;
+                var currentTask = _taskManager?.GetCurrentTask();
+                
+                DebugLog($"Player={player != null}({playerName}), Leader={leader != null}({leaderName}), " +
+                        $"ManualLeader='{manualLeaderName}', EnableFollowing={Settings?.EnableFollowing?.Value}, " +
+                        $"Distance={distance:F1}, CurrentTask={currentTask?.Description ?? "None"}, " +
+                        $"SameEntity={player == leader}");
             }
             
             // Sync manual leader setting
@@ -328,17 +366,25 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 if (Settings?.DebugMode?.Value == true)
                 {
                     ImGui.Separator();
-                    ImGui.TextColored(new System.Numerics.Vector4(1, 1, 0, 1), "DEBUG INFO:");
+                    ImGui.TextColored(new System.Numerics.Vector4(1, 1, 0, 1), "DEBUG LOG:");
                     
-                    // Movement Manager Debug
-                    if (_movementManager != null)
+                    // Show recent debug messages in a scrollable region
+                    if (ImGui.BeginChild("DebugLog", new System.Numerics.Vector2(0, 100), true))
                     {
-                        var debugInfo = GetMovementDebugInfo();
-                        foreach (var info in debugInfo)
+                        // Show last 10 debug messages (newest first)
+                        var recentMessages = _debugLog.TakeLast(10).Reverse().ToList();
+                        foreach (var message in recentMessages)
                         {
-                            ImGui.Text(info);
+                            ImGui.TextWrapped(message);
+                        }
+                        
+                        // Auto-scroll to bottom for newest messages
+                        if (_debugLog.Count > 0)
+                        {
+                            ImGui.SetScrollHereY(1.0f);
                         }
                     }
+                    ImGui.EndChild();
                 }
             }
             ImGui.End();
