@@ -41,6 +41,7 @@ public class PredictiveMovement : IPathfinding
     private const float DirectClickRange = 200f;    // Range for direct leader clicking
     private const float LeaderDetectionRange = 1500f; // Maximum range to detect leader
     private const float MaxLeaderAge = 5.0f;        // Max seconds since last leader update
+    private const float ConfidentStepSize = 150f;   // Aggressive step size when leader detected
     
     public PredictiveMovement(GameController gameController, Action<string> debugLog)
     {
