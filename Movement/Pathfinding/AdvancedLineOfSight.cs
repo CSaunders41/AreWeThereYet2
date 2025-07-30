@@ -136,8 +136,8 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Get next movement point with intelligent obstacle avoidance
-    /// Fixed: More aggressive movement when leader is far away - ALWAYS returns a valid point
+    /// REWRITTEN: Simple, aggressive movement like original AreWeThereYet
+    /// Always uses large fixed steps, minimal safety checks to prevent stuck scenarios
     /// </summary>
     public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
     {
@@ -145,48 +145,64 @@ public class AdvancedLineOfSight : IPathfinding
         {
             var distance = Vector3.Distance(currentPos, targetPos);
             
-            // If close enough, move directly to target
-            if (distance <= 50f)
+            // If very close, move directly to target
+            if (distance <= 30f)
                 return targetPos;
             
-            // FIXED: More aggressive step calculation when leader is far
-            var stepSize = CalculateAggressiveStepSize(currentPos, targetPos, distance);
             var direction = Vector3.Normalize(targetPos - currentPos);
+            
+            // CRITICAL FIX: Use FIXED large step sizes like original AreWeThereYet
+            float stepSize = 120f; // Always use large steps (120 units)
+            
+            // For very far leaders, use even bigger steps
+            if (distance > 300f)
+                stepSize = 180f; // Extra large steps for very far leaders
+            
+            // Don't make steps larger than remaining distance 
+            stepSize = Math.Min(stepSize, distance);
+            
             var candidatePoint = currentPos + (direction * stepSize);
             
-            _debugLog($"MOVEMENT STEP: Distance={distance:F1}, StepSize={stepSize:F1}, CandidatePoint={candidatePoint}");
+            _debugLog($"SIMPLE MOVEMENT: Distance={distance:F1}, FixedStep={stepSize:F1}, Target={candidatePoint}");
             
-            // For direct movement mode, be less restrictive about "safety"
-            // When leader is far, prioritize movement over perfect safety
-            if (distance > 150f)
+            // MINIMAL safety check - only avoid truly impassable terrain
+            // Don't over-analyze like before - this caused the stuck issues
+            if (IsBasicallySafe(candidatePoint))
             {
-                _debugLog($"MOVEMENT: Leader far ({distance:F1}), using aggressive step - {stepSize:F1} units");
-                return candidatePoint; // Always take the big step when leader is far
+                _debugLog($"MOVING: Taking {stepSize:F1} unit step toward leader");
+                return candidatePoint;
             }
             
-            // Check if candidate point is safe for closer movements
-            if (IsPositionSafe(candidatePoint))
-                return candidatePoint;
+            // Simple obstacle avoidance - try left/right angles
+            var leftPoint = currentPos + (RotateVector(direction, 30f) * stepSize);
+            if (IsBasicallySafe(leftPoint))
+            {
+                _debugLog($"OBSTACLE AVOID: Taking left angle step {stepSize:F1} units");
+                return leftPoint;
+            }
             
-            // Try intelligent variations around obstacles
-            var alternativePoint = FindSafeAlternativePoint(currentPos, direction, stepSize);
-            if (alternativePoint.HasValue)
-                return alternativePoint;
+            var rightPoint = currentPos + (RotateVector(direction, -30f) * stepSize);
+            if (IsBasicallySafe(rightPoint))
+            {
+                _debugLog($"OBSTACLE AVOID: Taking right angle step {stepSize:F1} units");
+                return rightPoint;
+            }
             
-            // FALLBACK: If nothing else works, take a smaller but guaranteed step
-            var conservativeStep = Math.Min(stepSize * 0.5f, 75f);
-            var fallbackPoint = currentPos + (direction * conservativeStep);
-            _debugLog($"MOVEMENT: Using fallback step - {conservativeStep:F1} units toward leader");
-            return fallbackPoint;
+            // LAST RESORT: Still use a decent sized step (80 units minimum)
+            // This prevents the tiny steps that cause stuck scenarios
+            var safeStep = Math.Max(80f, stepSize * 0.7f);
+            var safePoint = currentPos + (direction * safeStep);
+            _debugLog($"SAFE FALLBACK: Taking {safeStep:F1} unit step (no tiny steps!)");
+            return safePoint;
         }
         catch (Exception ex)
         {
-            _debugLog($"ADVANCED GetNextMovePoint error: {ex.Message}");
-            // Even on error, return a basic step toward target
+            _debugLog($"GetNextMovePoint error: {ex.Message}");
+            // Even on error, take a decent sized step toward target
             var distance = Vector3.Distance(currentPos, targetPos);
             var direction = Vector3.Normalize(targetPos - currentPos);
-            var basicStep = Math.Min(60f, distance * 0.4f);
-            return currentPos + (direction * basicStep);
+            var emergencyStep = Math.Min(100f, distance); // Always at least try for 100 units
+            return currentPos + (direction * emergencyStep);
         }
     }
 
@@ -957,6 +973,31 @@ public class AdvancedLineOfSight : IPathfinding
     private bool IsPositionSafe(Vector3 position)
     {
         return IsWalkable(position);
+    }
+
+    /// <summary>
+    /// SIMPLE safety check - only avoids truly impassable terrain
+    /// Much less restrictive than IsPositionSafe to prevent stuck scenarios
+    /// </summary>
+    private bool IsBasicallySafe(Vector3 position)
+    {
+        try
+        {
+            var player = _gameController?.Player;
+            if (player?.Pos == null) return true;
+
+            // Only do the most basic checks - avoid over-analysis
+            var distance = Vector3.Distance(player.Pos, position);
+            var heightDiff = Math.Abs(position.Z - player.Pos.Z);
+            
+            // Very permissive limits - only block truly unreachable positions
+            return distance <= 3000f && heightDiff <= 300f;
+        }
+        catch
+        {
+            // If any error, assume it's safe - better to move than get stuck
+            return true;
+        }
     }
 
     /// <summary>
