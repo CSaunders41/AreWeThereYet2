@@ -135,12 +135,38 @@ public class PredictiveMovement : IPathfinding
     }
 
     /// <summary>
-    /// Get next movement point with large, aggressive steps
+    /// EXPERIMENT 5: Direct Leader Clicking like Original AreWeThereYet
     /// </summary>
     public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
     {
         try
         {
+            // STEP 1: DETECT LEADER FROM EXILECORE MEMORY
+            var leaderResult = DetectLeaderFromMemory(currentPos);
+            
+            if (leaderResult.Found)
+            {
+                _debugLog($"DIRECT LEADER DETECTED: Distance={leaderResult.Distance:F1}, InRange={leaderResult.InDirectClickRange}");
+                
+                // DIRECT LEADER CLICKING - Like original AreWeThereYet!
+                if (leaderResult.InDirectClickRange)
+                {
+                    _debugLog($"DIRECT LEADER CLICK: Clicking directly on leader position!");
+                    return leaderResult.Position; // Click EXACTLY where leader is - no waypoints!
+                }
+                else
+                {
+                    // Leader detected but distant - take CONFIDENT large steps toward them
+                    _debugLog($"CONFIDENT STEP: Large step toward detected leader");
+                    var direction = Vector3.Normalize(leaderResult.Position - currentPos);
+                    var stepSize = ConfidentStepSize; // 150f - aggressive movement
+                    return currentPos + (direction * Math.Min(stepSize, leaderResult.Distance));
+                }
+            }
+            
+            // STEP 2: NO LEADER DETECTED - FALLBACK TO TRADITIONAL PATHFINDING
+            _debugLog($"NO LEADER DETECTED: Using traditional pathfinding to target position");
+            
             var distance = Vector3.Distance(currentPos, targetPos);
             
             // If very close, move directly to target
@@ -148,93 +174,43 @@ public class PredictiveMovement : IPathfinding
             
             var direction = Vector3.Normalize(targetPos - currentPos);
             
-            // Use large, aggressive steps like original AreWeThereYet
+            // Use standard steps when no leader detected
             float stepSize = CalculateAggressiveStepSize(distance);
-            
-            // Don't make steps larger than remaining distance
             stepSize = Math.Min(stepSize, distance);
             
             var candidatePoint = currentPos + (direction * stepSize);
             
-            _debugLog($"PREDICTIVE: Distance={distance:F1}, StepSize={stepSize:F1}, Target={candidatePoint}");
-            _debugLog($"PREDICTIVE DEBUG: MinStep={MinStepSize}, StandardStep={StandardStepSize}, AggressiveStep={AggressiveStepSize}");
+            _debugLog($"FALLBACK: Distance={distance:F1}, StepSize={stepSize:F1}");
             
-            // USE EXILECORE MEMORY - Check for actual obstacles!
+            // USE EXILECORE MEMORY - Check for actual obstacles
             if (!HasMajorObstacleAt(candidatePoint))
             {
                 return candidatePoint;
             }
             
-            _debugLog($"PREDICTIVE: Direct path blocked, trying avoidance angles");
-            
-            // SMART CORNER NAVIGATION - Try multiple angles to get around obstacles
-            float[] avoidanceAngles = { 30f, -30f, 45f, -45f, 60f, -60f, 90f, -90f };
+            // Try simple obstacle avoidance
+            float[] avoidanceAngles = { 30f, -30f, 45f, -45f };
             
             foreach (var angle in avoidanceAngles)
             {
                 var avoidancePoint = currentPos + (RotateVector2D(direction, angle) * stepSize);
                 if (!HasMajorObstacleAt(avoidancePoint))
                 {
-                    _debugLog($"PREDICTIVE: Using {angle}° avoidance angle");
+                    _debugLog($"FALLBACK: Using {angle}° avoidance angle");
                     return avoidancePoint;
                 }
             }
             
-            // CORNER NAVIGATION FALLBACK - Try shorter steps with wider angles
-            var shorterStep = stepSize * 0.6f;
-            foreach (var angle in avoidanceAngles)
-            {
-                var avoidancePoint = currentPos + (RotateVector2D(direction, angle) * shorterStep);
-                if (!HasMajorObstacleAt(avoidancePoint))
-                {
-                    _debugLog($"PREDICTIVE: Using shorter step with {angle}° avoidance");
-                    return avoidancePoint;
-                }
-            }
-            
-            // FINAL FALLBACK STRATEGIES - Don't get stuck!
-            _debugLog($"PREDICTIVE: All avoidance angles blocked, trying fallback strategies");
-            
-            // Strategy 1: Try backward movement to get unstuck
-            var backwardStep = MinStepSize * 0.5f;
-            var backwardPoint = currentPos + (direction * -backwardStep);
-            if (!HasMajorObstacleAt(backwardPoint))
-            {
-                _debugLog($"PREDICTIVE: Using backward unstuck movement");
-                return backwardPoint;
-            }
-            
-            // Strategy 2: Try perpendicular movement (sideways slide)
-            var perpendicularDir = RotateVector2D(direction, 90f);
-            var sideStep = MinStepSize * 0.8f;
-            var leftSlide = currentPos + (perpendicularDir * sideStep);
-            var rightSlide = currentPos + (perpendicularDir * -sideStep);
-            
-            if (!HasMajorObstacleAt(leftSlide))
-            {
-                _debugLog($"PREDICTIVE: Using left slide movement");
-                return leftSlide;
-            }
-            if (!HasMajorObstacleAt(rightSlide))
-            {
-                _debugLog($"PREDICTIVE: Using right slide movement");
-                return rightSlide;
-            }
-            
-            // Strategy 3: Micro-step forward (very small movement to avoid total stuck)
-            var microStep = Math.Min(MinStepSize * 0.3f, 25f);
+            // Final fallback - small step forward
+            var microStep = Math.Min(MinStepSize * 0.5f, 30f);
             var microPoint = currentPos + (direction * microStep);
-            _debugLog($"PREDICTIVE: Emergency micro-step {microStep:F1} units");
+            _debugLog($"FALLBACK: Micro-step {microStep:F1} units");
             return microPoint;
         }
         catch (Exception ex)
         {
-            _debugLog($"PREDICTIVE: GetNextMovePoint error: {ex.Message}");
-            // Even on error, take a decent sized step toward target
-            var distance = Vector3.Distance(currentPos, targetPos);
-            var direction = Vector3.Normalize(targetPos - currentPos);
-            var emergencyStep = Math.Min(StandardStepSize, distance);
-            return currentPos + (direction * emergencyStep);
+            _debugLog($"DIRECT LEADER CLICK ERROR: {ex.Message}");
+            return targetPos; // Fallback to direct target
         }
     }
 
