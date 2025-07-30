@@ -24,10 +24,10 @@ public class MovementExecutor : IDisposable
     private DateTime _lastMovementTime = DateTime.MinValue;
     private bool _disposed = false;
 
-    // Movement constants
+    // Movement constants - FIXED: More aggressive movement to prevent falling behind
     private const float MovementThreshold = 20f; // Minimum distance to trigger movement
-    private const float WaypointThreshold = 30f; // Distance to consider waypoint reached
-    private const int MovementTimeout = 5000; // 5 seconds timeout for single movement
+    private const float WaypointThreshold = 50f; // FIXED: Larger threshold to prevent micro-movements
+    private const int MovementTimeout = 8000; // FIXED: Longer timeout for bigger movements
 
     public MovementExecutor(
         GameController gameController,
@@ -138,11 +138,14 @@ public class MovementExecutor : IDisposable
             var targetWaypoint = _currentPath.SimplifiedPath[_currentPathIndex];
             var distanceToWaypoint = Vector3.Distance(currentPos, targetWaypoint);
 
-            // Check if we've reached current waypoint
-            if (distanceToWaypoint <= WaypointThreshold)
+            // Check if we've reached current waypoint - FIXED: Dynamic threshold based on total distance
+            var totalDistance = Vector3.Distance(_gameController.Player.Pos, _currentPath.SimplifiedPath[_currentPath.SimplifiedPath.Count - 1]);
+            var dynamicThreshold = totalDistance > 200f ? WaypointThreshold * 1.5f : WaypointThreshold;
+            
+            if (distanceToWaypoint <= dynamicThreshold)
             {
                 _currentPathIndex++;
-                _debugLog($"MOVEMENT: Waypoint {_currentPathIndex} reached, advancing to next");
+                _debugLog($"MOVEMENT: Waypoint {_currentPathIndex} reached (threshold: {dynamicThreshold:F1}), advancing to next");
                 return true; // We moved (progressed to next waypoint)
             }
 
@@ -176,23 +179,23 @@ public class MovementExecutor : IDisposable
 
         try
         {
-            // Check if target has moved significantly
+            // Check if target has moved significantly - FIXED: More tolerant when leader is far
             var originalTarget = _currentPath.SimplifiedPath[_currentPath.SimplifiedPath.Count - 1];
-            var targetMoved = Vector3.Distance(originalTarget, targetPos) > 50f;
+            var targetMoved = Vector3.Distance(originalTarget, targetPos) > 80f; // FIXED: Larger tolerance
 
             if (targetMoved)
             {
-                _debugLog("MOVEMENT: Target moved, path invalid");
+                _debugLog("MOVEMENT: Target moved significantly, path invalid");
                 return false;
             }
 
-            // Check if we're far from our expected position on the path
+            // Check if we're far from our expected position on the path - FIXED: More tolerant
             if (_currentPathIndex < _currentPath.SimplifiedPath.Count)
             {
                 var expectedWaypoint = _currentPath.SimplifiedPath[_currentPathIndex];
                 var distanceFromPath = Vector3.Distance(currentPos, expectedWaypoint);
 
-                if (distanceFromPath > 100f) // We're too far from expected path
+                if (distanceFromPath > 150f) // FIXED: More tolerant to prevent constant recalculation
                 {
                     _debugLog("MOVEMENT: Too far from path, recalculating");
                     return false;

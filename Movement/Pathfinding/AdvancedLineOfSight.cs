@@ -122,6 +122,7 @@ public class AdvancedLineOfSight : IPathfinding
 
     /// <summary>
     /// Get next movement point with intelligent obstacle avoidance
+    /// Fixed: More aggressive movement when leader is far away
     /// </summary>
     public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
     {
@@ -130,13 +131,15 @@ public class AdvancedLineOfSight : IPathfinding
             var distance = Vector3.Distance(currentPos, targetPos);
             
             // If close enough, move directly to target
-            if (distance <= 100f)
+            if (distance <= 50f)
                 return targetPos;
             
-            // Calculate optimal step size based on terrain complexity
-            var stepSize = CalculateOptimalStepSize(currentPos, targetPos);
+            // FIXED: More aggressive step calculation when leader is far
+            var stepSize = CalculateAggressiveStepSize(currentPos, targetPos, distance);
             var direction = Vector3.Normalize(targetPos - currentPos);
             var candidatePoint = currentPos + (direction * stepSize);
+            
+            _debugLog($"MOVEMENT STEP: Distance={distance:F1}, StepSize={stepSize:F1}, Target={targetPos}");
             
             // Check if candidate point is safe
             if (IsPositionSafe(candidatePoint))
@@ -504,15 +507,36 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Calculate optimal step size based on terrain complexity
+    /// Calculate aggressive step size - larger steps when leader is far away
+    /// Fixed: Prevents bot from falling behind when leader moves fast
+    /// </summary>
+    private float CalculateAggressiveStepSize(Vector3 start, Vector3 target, float distance)
+    {
+        // FIXED: Much more aggressive stepping when leader is far
+        if (distance > 200f)
+        {
+            // Very far - take big steps (up to 150 units)
+            return Math.Min(150f, distance * 0.6f);
+        }
+        else if (distance > 100f)
+        {
+            // Far - take medium steps (up to 100 units)
+            return Math.Min(100f, distance * 0.5f);
+        }
+        else
+        {
+            // Close - take smaller steps (up to 60 units)
+            return Math.Min(60f, distance * 0.4f);
+        }
+    }
+
+    /// <summary>
+    /// Calculate optimal step size based on terrain complexity (legacy - kept for reference)
     /// </summary>
     private float CalculateOptimalStepSize(Vector3 start, Vector3 target)
     {
         var distance = Vector3.Distance(start, target);
-        var baseStepSize = Math.Min(80f, distance * 0.3f);
-        
-        // Adjust for terrain complexity (could be enhanced)
-        return baseStepSize;
+        return CalculateAggressiveStepSize(start, target, distance);
     }
 
     /// <summary>
