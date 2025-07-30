@@ -65,9 +65,15 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 var player = GameController?.Player;
                 var leader = _partyManager?.GetPartyLeader();
                 
-                LogMessage($"DEBUG: Player={player != null}, Leader={leader != null}, " +
-                          $"EnableFollowing={Settings?.EnableFollowing?.Value}, " +
-                          $"PlayerPos={player?.Pos}, LeaderPos={leader?.Pos}");
+                // Get player and leader names for comparison
+                var playerName = player?.GetComponent<Player>()?.PlayerName ?? "Unknown";
+                var leaderName = leader?.GetComponent<Player>()?.PlayerName ?? "Unknown";
+                var manualLeaderName = Settings?.ManualLeaderName?.Value ?? "";
+                
+                LogMessage($"DEBUG: Player={player != null}({playerName}), Leader={leader != null}({leaderName}), " +
+                          $"ManualLeader='{manualLeaderName}', EnableFollowing={Settings?.EnableFollowing?.Value}, " +
+                          $"PlayerPos={player?.Pos}, LeaderPos={leader?.Pos}, " +
+                          $"SameEntity={player == leader}");
             }
             
             // Sync manual leader setting
@@ -105,6 +111,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 if (ImGui.Button($"Following: {(isFollowing ? "ENABLED" : "DISABLED")}##FollowToggle", new System.Numerics.Vector2(200, 30)))
                 {
                     Settings.EnableFollowing.Value = !Settings.EnableFollowing.Value;
+                    LogMessage($"Following toggled to: {Settings.EnableFollowing.Value}");
                 }
                 ImGui.PopStyleColor();
                 
@@ -114,7 +121,12 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 if (ImGui.Checkbox("##EnableFollowingCheck", ref enableFollowing))
                 {
                     Settings.EnableFollowing.Value = enableFollowing;
+                    LogMessage($"Following checkbox set to: {Settings.EnableFollowing.Value}");
                 }
+                
+                // Debug text to verify setting state
+                ImGui.SameLine();
+                ImGui.Text($"(Debug: Actual={Settings.EnableFollowing.Value})");
             }
             
             ImGui.Separator();
