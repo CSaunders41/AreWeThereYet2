@@ -175,14 +175,30 @@ public class PartyManager : IDisposable
             _lastKnownManualLeaderName = playerName;
 
             // Find player by name in nearby players
+            var currentPlayer = _gameController?.Player;
             var targetPlayer = _nearbyPlayers.FirstOrDefault(p => 
             {
                 try
                 {
+                    // CRITICAL BUG FIX: Make sure we don't select the player's own entity
+                    if (p == currentPlayer) 
+                    {
+                        return false; // Never select the player's own entity as leader
+                    }
+                    
                     var player = p.GetComponent<Player>();
-                    return player?.PlayerName?.Equals(playerName, StringComparison.OrdinalIgnoreCase) == true;
+                    var playerName_entity = player?.PlayerName;
+                    var matches = playerName_entity?.Equals(playerName, StringComparison.OrdinalIgnoreCase) == true;
+                    
+                    // Double-check this isn't the current player (extra safety)
+                    if (matches && currentPlayer != null && p == currentPlayer)
+                    {
+                        return false; // Never select player's own entity
+                    }
+                    
+                    return matches;
                 }
-                catch
+                catch (Exception ex)
                 {
                     return false;
                 }
@@ -306,6 +322,13 @@ public class PartyManager : IDisposable
                     // Check if entity has a valid player component
                     var playerComponent = entity.GetComponent<Player>();
                     if (playerComponent?.PlayerName == null) continue;
+
+                    // ADDITIONAL SAFETY: Double-check this isn't the current player's entity
+                    // This prevents any edge cases where entity == player check might fail
+                    if (playerComponent.PlayerName.Equals(player.GetComponent<Player>()?.PlayerName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue; // Skip player's own character
+                    }
 
                     // Add to nearby players list (we'll filter by distance if needed)
                     var distance = GetDistanceBetweenEntities(player, entity);
