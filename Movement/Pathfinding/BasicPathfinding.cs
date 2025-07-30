@@ -149,32 +149,42 @@ public class BasicPathfinding : IPathfinding
     }
 
     /// <summary>
-    /// Check if position is walkable (basic terrain detection)
+    /// Check if position is walkable (simplified for Phase 2)
+    /// TODO: Integrate with original AreWeThereYet LineOfSight system for advanced terrain detection
     /// </summary>
     public bool IsWalkable(Vector3 position)
     {
         try
         {
-            // Basic walkability check using ExileCore terrain data
-            // This will be enhanced with LineOfSight integration later
+            // Simplified walkability check - assume most positions are walkable for now
+            // This avoids ExileCore terrain API issues and focuses on basic movement
             
-            var terrain = _gameController?.Game?.IngameState?.Data?.Terrain;
-            if (terrain == null)
-                return true; // Assume walkable if no terrain data
-
-            // Convert world position to terrain coordinates
-            var terrainPos = terrain.WorldToTerrain(position);
-            
-            // Check if within terrain bounds
-            if (terrainPos.X < 0 || terrainPos.Y < 0 || 
-                terrainPos.X >= terrain.NumCellsX || terrainPos.Y >= terrain.NumCellsY)
+            var player = _gameController?.Player;
+            if (player == null)
                 return false;
 
-            // Get terrain data at position
-            var terrainData = terrain.TerrainData[terrainPos.Y * terrain.NumCellsX + terrainPos.X];
+            var currentPos = player.Pos;
+            var distance = Vector3.Distance(currentPos, position);
             
-            // Basic walkability: not a wall or obstacle
-            return (terrainData & 1) == 0; // Bit 0 = walkable
+            // Very basic checks to avoid obvious bad positions
+            // Distance check - don't try to walk too far at once
+            if (distance > 1000f)
+            {
+                _debugLog($"IsWalkable: Position too far ({distance:F1} units)");
+                return false;
+            }
+            
+            // Height difference check - avoid major elevation changes
+            var heightDiff = Math.Abs(position.Z - currentPos.Z);
+            if (heightDiff > 100f)
+            {
+                _debugLog($"IsWalkable: Height difference too large ({heightDiff:F1} units)");
+                return false;
+            }
+            
+            // For Phase 2, assume most positions are walkable
+            // TODO: Integrate AreWeThereYet's LineOfSight system for proper terrain detection
+            return true;
         }
         catch (Exception ex)
         {
