@@ -1,5 +1,6 @@
 using ExileCore;
 using ExileCore.PoEMemory.MemoryObjects;
+using ExileCore.PoEMemory.Components;
 using SharpDX;
 using AreWeThereYet2.Core;
 using AreWeThereYet2.Party;
