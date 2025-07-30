@@ -81,10 +81,19 @@ public class TaskManager : IDisposable
             {
                 if (_taskLookup.TryGetValue(taskId, out var task))
                 {
+                    // DEBUG: Log task removal with details
+                    _errorManager.HandleError("TaskManager.Debug", 
+                        new Exception($"REMOVING TASK: {taskId}, Status: {task.Status}, Description: {task.Description}"));
+                    
                     task.Cancel();
                     _taskQueue.Remove(task);
                     _taskLookup.Remove(taskId);
                     return true;
+                }
+                else
+                {
+                    _errorManager.HandleError("TaskManager.Debug", 
+                        new Exception($"REMOVE TASK FAILED: Task {taskId} not found in lookup"));
                 }
             }
             catch (Exception ex)
@@ -131,6 +140,10 @@ public class TaskManager : IDisposable
                     
                     if (_currentTask.IsCompleted() || _currentTask.IsFailed())
                     {
+                        // DEBUG: Log task completion/failure
+                        _errorManager.HandleError("TaskManager.Debug", 
+                            new Exception($"TASK FINISHED: {_currentTask.Id}, Completed: {_currentTask.IsCompleted()}, Failed: {_currentTask.IsFailed()}, Status: {_currentTask.Status}"));
+                        
                         // Task finished, move to completed queue
                         _completedTasks.Enqueue(_currentTask);
                         _taskQueue.Remove(_currentTask);
@@ -162,6 +175,10 @@ public class TaskManager : IDisposable
                 // Handle immediate completion/failure
                 if (_currentTask.IsCompleted() || _currentTask.IsFailed())
                 {
+                    // DEBUG: Log immediate task completion/failure
+                    _errorManager.HandleError("TaskManager.Debug", 
+                        new Exception($"TASK IMMEDIATE FINISH: {_currentTask.Id}, Completed: {_currentTask.IsCompleted()}, Failed: {_currentTask.IsFailed()}, Status: {_currentTask.Status}"));
+                    
                     _completedTasks.Enqueue(_currentTask);
                     _taskQueue.Remove(_currentTask);
                     _taskLookup.Remove(_currentTask.Id);

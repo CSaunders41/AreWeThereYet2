@@ -140,24 +140,36 @@ public class MovementManager : IDisposable
             // Simple follow logic - no complex task system
             if (distance > followDistance)
             {
-                // DIRECTLY try to create a simple follow task
-                _errorManager.HandleError("MovementManager.Debug", 
-                    new Exception($"SHOULD CREATE TASK! Distance {distance:F1} > {followDistance:F1}"));
+                // Check if task already exists BEFORE creating
+                bool hasTaskBefore = _taskManager.HasTask("follow_leader");
                 
-                // Check if we can actually create the task
-                bool canMove = CanExecuteMovement();
-                bool isReady = IsReadyForMovement();
-                
-                _errorManager.HandleError("MovementManager.Debug", 
-                    new Exception($"CanExecuteMovement={canMove}, IsReadyForMovement={isReady}"));
+                if (!hasTaskBefore)
+                {
+                    _errorManager.HandleError("MovementManager.Debug", 
+                        new Exception($"CREATING NEW TASK! Distance {distance:F1} > {followDistance:F1}"));
                     
-                CreateFollowTask(leaderPos, distance);
-                
-                // Verify task was actually added
-                bool hasTask = _taskManager.HasTask("follow_leader");
-                int taskCount = _taskManager.GetActiveTaskCount();
-                _errorManager.HandleError("MovementManager.Debug", 
-                    new Exception($"After CreateFollowTask: HasTask={hasTask}, TaskCount={taskCount}"));
+                    // Check if we can actually create the task
+                    bool canMove = CanExecuteMovement();
+                    bool isReady = IsReadyForMovement();
+                    
+                    _errorManager.HandleError("MovementManager.Debug", 
+                        new Exception($"CanExecuteMovement={canMove}, IsReadyForMovement={isReady}"));
+                        
+                    CreateFollowTask(leaderPos, distance);
+                    
+                    // Verify task was actually added
+                    bool hasTaskAfter = _taskManager.HasTask("follow_leader");
+                    int taskCount = _taskManager.GetActiveTaskCount();
+                    _errorManager.HandleError("MovementManager.Debug", 
+                        new Exception($"After CreateFollowTask: HasTask={hasTaskAfter}, TaskCount={taskCount}"));
+                }
+                else
+                {
+                    // Task already exists - check its status
+                    var currentTask = _taskManager.GetCurrentTask();
+                    _errorManager.HandleError("MovementManager.Debug", 
+                        new Exception($"TASK EXISTS: Current={currentTask?.Description ?? "None"}, Status={currentTask?.Status.ToString() ?? "None"}"));
+                }
             }
             else
             {
