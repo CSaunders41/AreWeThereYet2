@@ -301,22 +301,25 @@ public class AdvancedLineOfSight : IPathfinding
     {
         try
         {
-            var entities = _gameController?.EntityListWrapper?.ValidEntitiesByType?[EntityType.Door];
-            if (entities == null) return false;
+            // For Phase 2.1, simplify door detection to avoid API issues
+            // Check for door-like entities using general entity search
+            var allEntities = _gameController?.EntityListWrapper?.Entities;
+            if (allEntities == null) return false;
             
-            foreach (var door in entities)
+            foreach (var entity in allEntities)
             {
-                if (door?.Pos == null) continue;
+                if (entity?.Pos == null || !entity.IsValid) continue;
                 
-                var distance = Vector3.Distance(position, door.Pos);
+                var distance = Vector3.Distance(position, entity.Pos);
                 if (distance <= MinObstacleDistance)
                 {
-                    // Check door state - closed doors are obstacles
-                    var doorComponent = door.GetComponent<Door>();
-                    if (doorComponent != null && !doorComponent.IsOpened)
+                    // Check if entity looks like a door based on metadata
+                    var metadata = entity.Metadata;
+                    if (metadata?.Contains("door", StringComparison.OrdinalIgnoreCase) == true)
                     {
-                        _debugLog($"ADVANCED: Closed door detected at {door.Pos}");
-                        return true;
+                        _debugLog($"ADVANCED: Door-like entity detected at {entity.Pos}");
+                        // For Phase 2.1, treat doors as walkable (will be enhanced with proper door API)
+                        return false; // Doors are walkable for now
                     }
                 }
             }
@@ -385,9 +388,16 @@ public class AdvancedLineOfSight : IPathfinding
                     
                     // Check for blocking entities
                     var render = entity.GetComponent<Render>();
-                    if (render != null && render.Bounds.Height > 20) // Significant obstacle
+                    if (render != null)
                     {
-                        return true;
+                        // For Phase 2.1, use simplified obstacle detection
+                        // Check if render name suggests it's a blocking entity
+                        var renderName = render.Name?.ToLowerInvariant() ?? "";
+                        if (renderName.Contains("chest") || renderName.Contains("statue") || 
+                            renderName.Contains("pillar") || renderName.Contains("block"))
+                        {
+                            return true;
+                        }
                     }
                 }
             }
@@ -422,14 +432,31 @@ public class AdvancedLineOfSight : IPathfinding
             {
                 foreach (var monster in monsters)
                 {
-                    if (monster?.Pos == null) continue;
+                    if (monster?.Pos == null || !monster.IsValid) continue;
                     
                     var distance = Vector3.Distance(position, monster.Pos);
                     if (distance <= MinObstacleDistance)
                     {
+                        // Check if monster is alive using safe component access
                         var life = monster.GetComponent<Life>();
-                        if (life != null && life.CurHP > 0) // Alive monster
+                        if (life != null)
                         {
+                            try
+                            {
+                                if (life.CurHP > 0) // Alive monster
+                                {
+                                    return true;
+                                }
+                            }
+                            catch
+                            {
+                                // If we can't read HP, assume monster is alive (safer approach)
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            // No life component - assume it's a dynamic obstacle
                             return true;
                         }
                     }
