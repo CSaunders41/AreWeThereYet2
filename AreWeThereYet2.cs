@@ -87,6 +87,47 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
         }
     }
 
+    /// <summary>
+    /// CRITICAL FEATURE: Check for hotkey toggle to stop following when bot controls mouse
+    /// </summary>
+    private void CheckFollowToggleHotkey()
+    {
+        try
+        {
+            if (Settings?.FollowToggleHotkey == null || Settings?.EnableFollowing == null)
+                return;
+            
+            // Check if the hotkey was just pressed (PressedOnce prevents continuous toggling)
+            if (Settings.FollowToggleHotkey.PressedOnce())
+            {
+                // Toggle the following state
+                var wasFollowing = Settings.EnableFollowing.Value;
+                Settings.EnableFollowing.Value = !wasFollowing;
+                
+                // Provide clear feedback to user
+                var newState = Settings.EnableFollowing.Value ? "ENABLED" : "DISABLED";
+                var hotkeyName = Settings.FollowToggleHotkey.Value.ToString();
+                
+                LogMessage($"🎯 FOLLOW TOGGLE: {newState} (Hotkey: {hotkeyName})", 5);
+                DebugLog($"HOTKEY TOGGLE: Following changed from {wasFollowing} to {Settings.EnableFollowing.Value}");
+                
+                // Clear any existing movement tasks when disabling to stop immediately
+                if (!Settings.EnableFollowing.Value)
+                {
+                    _taskManager?.ClearAllTasks();
+                    DebugLog("HOTKEY: Cleared all movement tasks - following STOPPED");
+                }
+                
+                // Visual feedback in overlay log
+                DebugLog($"🔥 HOTKEY ACTIVATED: Following is now {newState}!");
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorManager?.HandleError("CheckFollowToggleHotkey", ex);
+        }
+    }
+
     public override void Render()
     {
         try
@@ -95,6 +136,9 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             if (!GameController.Game.IngameState.InGame)
                 return;
 
+            // Check for hotkey toggle (CRITICAL: allows user to stop following when bot controls mouse)
+            CheckFollowToggleHotkey();
+            
             // Update managers
             _taskManager?.Update();
             _partyManager?.Update();
@@ -141,8 +185,19 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
         try
         {
             // Settings will be implemented later
-            ImGui.Text("AreWeThereYet2 v2.0 - Phase 0 Development");
+            ImGui.Text("AreWeThereYet2 v2.0 - Enhanced Pathfinding");
             ImGui.Text("Enhanced follower plugin combining superior pathfinding with comprehensive features");
+            
+            // CRITICAL: Prominent hotkey information
+            if (Settings?.FollowToggleHotkey != null)
+            {
+                var hotkeyName = Settings.FollowToggleHotkey.Value.ToString();
+                ImGui.PushStyleColor(Text, new System.Numerics.Vector4(1, 1, 0, 1)); // Yellow text
+                ImGui.Text($"🔑 EMERGENCY HOTKEY: Press {hotkeyName} to toggle following ON/OFF");
+                ImGui.Text("   ⚠️  Essential when bot controls your mouse!");
+                ImGui.PopStyleColor();
+            }
+            
             ImGui.Separator();
             
             // Follow Toggle Button (prominent placement)

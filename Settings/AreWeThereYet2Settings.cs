@@ -1,6 +1,7 @@
 using ExileCore.Shared.Interfaces;
 using ExileCore.Shared.Nodes;
 using ExileCore.Shared.Attributes;
+using System.Windows.Forms;
 
 namespace AreWeThereYet2.Settings;
 
@@ -17,6 +18,9 @@ public class AreWeThereYet2Settings : ISettings
 
     [Menu("Enable Following")]
     public ToggleNode EnableFollowing { get; set; } = new ToggleNode(false);
+
+    [Menu("Follow Toggle Hotkey", "Keyboard hotkey to toggle following on/off (essential when bot controls mouse)")]
+    public HotkeyNode FollowToggleHotkey { get; set; } = new HotkeyNode(Keys.F1);
 
     [Menu("Auto-detect Party Leader")]
     public ToggleNode AutoDetectLeader { get; set; } = new ToggleNode(true);
