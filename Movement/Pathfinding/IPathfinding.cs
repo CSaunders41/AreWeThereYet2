@@ -58,3 +58,39 @@ public enum TerrainType
     Door = 4,
     Unknown = 5
 }
+
+/// <summary>
+/// Door states for real-time door monitoring - ENHANCED pathfinding
+/// </summary>
+public enum DoorState
+{
+    None,       // No door present
+    Open,       // Door is open and passable
+    Closed,     // Door is closed and blocking
+    Opening     // Door is in transition (opening/closing)
+}
+
+/// <summary>
+/// Movement skill types for intelligent obstacle bypass - CRITICAL FEATURE from original AreWeThereYet
+/// </summary>
+public enum MovementSkillType
+{
+    None,           // No movement skill needed
+    Dash,           // Quick dash through gaps
+    LeapSlam,       // Leap over obstacles
+    LightningWarp,  // Teleport past complex obstacles
+    Blink,          // Short-range teleport
+    FlameRush       // Fire-based movement skill
+}
+
+/// <summary>
+/// Obstacle information for pathfinding analysis
+/// </summary>
+public class ObstacleInfo
+{
+    public Vector3 Position { get; set; }
+    public TerrainType Type { get; set; }
+    public float Distance { get; set; }
+    public float Width { get; set; }
+    public bool CanBypass { get; set; }
+}

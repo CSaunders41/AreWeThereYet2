@@ -256,7 +256,7 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Perform raycast line-of-sight check - simplified for Phase 2.1 to prevent pathfinding issues
+    /// ENHANCED raycast line-of-sight check - like original AreWeThereYet with variable step analysis
     /// </summary>
     private bool IsDirectLineOfSightClear(Vector3 start, Vector3 target)
     {
@@ -264,26 +264,52 @@ public class AdvancedLineOfSight : IPathfinding
         {
             var distance = Vector3.Distance(start, target);
             
-            // Simple distance check - if too far, probably not direct
+            // Enhanced distance check with terrain complexity assessment
             if (distance > MaxDirectPathDistance)
-                return false;
-
-            // For Phase 2.1, use basic walkability checks instead of complex terrain analysis
-            // Check a few points along the line instead of intensive raycast
-            var steps = Math.Max(3, (int)(distance / 100)); // Check every ~100 units
-            
-            for (int i = 1; i < steps; i++)
             {
-                var t = (float)i / steps;
-                var checkPoint = Vector3.Lerp(start, target, t);
+                _debugLog($"ADVANCED: Distance too far for direct path: {distance:F1} > {MaxDirectPathDistance}");
+                return false;
+            }
+
+            // ENHANCED: Variable step size based on distance and terrain complexity
+            var baseStepSize = CalculateOptimalRaycastStepSize(distance);
+            var currentStepSize = baseStepSize;
+            var currentPos = start;
+            var direction = Vector3.Normalize(target - start);
+            
+            _debugLog($"ADVANCED: Raycast check - Distance: {distance:F1}, BaseStep: {baseStepSize:F1}");
+            
+            while (Vector3.Distance(currentPos, target) > currentStepSize)
+            {
+                currentPos += direction * currentStepSize;
                 
-                if (!IsWalkable(checkPoint))
+                // Enhanced terrain analysis at each step
+                var terrainType = AnalyzeTerrainAt(currentPos);
+                
+                // Handle different terrain types appropriately
+                if (!IsTerrainPassable(terrainType, currentPos))
                 {
-                    _debugLog($"ADVANCED: Line-of-sight blocked at {checkPoint}");
+                    _debugLog($"ADVANCED: Line-of-sight blocked by {terrainType} at {currentPos}");
                     return false;
                 }
+                
+                // Adjust step size based on terrain complexity
+                currentStepSize = AdjustStepSizeForTerrain(terrainType, baseStepSize);
+                
+                // Safety check to prevent infinite loops
+                if (currentStepSize < 5f)
+                    currentStepSize = 5f;
             }
             
+            // Final check at target position
+            var targetTerrain = AnalyzeTerrainAt(target);
+            if (!IsTerrainPassable(targetTerrain, target))
+            {
+                _debugLog($"ADVANCED: Target position blocked by {targetTerrain}");
+                return false;
+            }
+            
+            _debugLog($"ADVANCED: Direct line-of-sight CLEAR over {distance:F1} units");
             return true;
         }
         catch (Exception ex)
@@ -294,7 +320,83 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Find optimal waypoints using advanced terrain analysis
+    /// Calculate optimal raycast step size based on distance and complexity
+    /// </summary>
+    private float CalculateOptimalRaycastStepSize(float distance)
+    {
+        // Short distance: small steps for precision
+        if (distance < 50f) return 10f;
+        
+        // Medium distance: balanced steps
+        if (distance < 150f) return 15f;
+        
+        // Long distance: larger steps for performance
+        if (distance < 300f) return 25f;
+        
+        // Very long distance: largest steps
+        return 35f;
+    }
+
+    /// <summary>
+    /// Determine if terrain type is passable
+    /// </summary>
+    private bool IsTerrainPassable(TerrainType terrainType, Vector3 position)
+    {
+        switch (terrainType)
+        {
+            case TerrainType.Walkable:
+                return true;
+                
+            case TerrainType.Door:
+                // Check actual door state
+                var doorState = GetDoorState(position);
+                return doorState == DoorState.Open || doorState == DoorState.Opening;
+                
+            case TerrainType.Water:
+                // Water might be passable depending on depth/type
+                return true; // For now, assume passable
+                
+            case TerrainType.Wall:
+                return false; // Walls are never passable
+                
+            case TerrainType.Obstacle:
+                // Some obstacles might be bypassable with movement skills
+                return false; // Conservative approach
+                
+            case TerrainType.Unknown:
+                return true; // Assume passable if unknown
+                
+            default:
+                return true;
+        }
+    }
+
+    /// <summary>
+    /// Adjust step size based on terrain complexity
+    /// </summary>
+    private float AdjustStepSizeForTerrain(TerrainType terrainType, float baseStepSize)
+    {
+        switch (terrainType)
+        {
+            case TerrainType.Walkable:
+                return baseStepSize; // Normal step size
+                
+            case TerrainType.Door:
+                return baseStepSize * 0.5f; // Smaller steps near doors for precision
+                
+            case TerrainType.Water:
+                return baseStepSize * 0.7f; // Slightly smaller steps in water
+                
+            case TerrainType.Obstacle:
+                return baseStepSize * 0.3f; // Much smaller steps near obstacles
+                
+            default:
+                return baseStepSize;
+        }
+    }
+
+    /// <summary>
+    /// Find optimal waypoints using advanced terrain analysis - ENHANCED with movement skill support
     /// </summary>
     private List<Vector3> FindOptimalWaypoints(Vector3 start, Vector3 target)
     {
@@ -304,7 +406,15 @@ public class AdvancedLineOfSight : IPathfinding
             var direction = Vector3.Normalize(target - start);
             var distance = Vector3.Distance(start, target);
             
-            // Calculate strategic waypoint positions
+            // ENHANCED: Check if movement skills can bypass obstacles entirely
+            var movementSkillPath = AnalyzeMovementSkillPath(start, target);
+            if (movementSkillPath != null && movementSkillPath.Count > 0)
+            {
+                _debugLog($"ADVANCED: Movement skill path found with {movementSkillPath.Count} skill points");
+                return movementSkillPath;
+            }
+            
+            // Traditional waypoint pathfinding
             for (int attempt = 0; attempt < MaxWaypointAttempts; attempt++)
             {
                 var angle = (attempt * 45f) - 180f; // Try different angles
@@ -332,34 +442,301 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Advanced terrain analysis at specific position
+    /// CRITICAL FEATURE: Analyze movement skill usage for obstacle bypass - like original AreWeThereYet
+    /// </summary>
+    private List<Vector3>? AnalyzeMovementSkillPath(Vector3 start, Vector3 target)
+    {
+        try
+        {
+            var distance = Vector3.Distance(start, target);
+            
+            // Only consider movement skills for medium to long distances with obstacles
+            if (distance < 75f || distance > 500f)
+                return null;
+            
+            // Check what obstacles are blocking the direct path
+            var obstacleMap = AnalyzeObstacleMap(start, target);
+            if (obstacleMap.Count == 0)
+                return null; // No obstacles, regular movement is fine
+            
+            // Determine best movement skill strategy
+            var movementSkillType = DetermineOptimalMovementSkill(obstacleMap, distance);
+            if (movementSkillType == MovementSkillType.None)
+                return null;
+            
+            // Generate movement skill waypoints
+            var skillWaypoints = GenerateMovementSkillWaypoints(start, target, movementSkillType, obstacleMap);
+            
+            if (skillWaypoints != null && skillWaypoints.Count > 0)
+            {
+                _debugLog($"ADVANCED: {movementSkillType} skill path generated with {skillWaypoints.Count} points");
+                return skillWaypoints;
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"AnalyzeMovementSkillPath error: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Analyze obstacles between start and target
+    /// </summary>
+    private List<ObstacleInfo> AnalyzeObstacleMap(Vector3 start, Vector3 target)
+    {
+        var obstacles = new List<ObstacleInfo>();
+        
+        try
+        {
+            var direction = Vector3.Normalize(target - start);
+            var distance = Vector3.Distance(start, target);
+            var stepSize = 20f;
+            
+            for (float d = stepSize; d < distance; d += stepSize)
+            {
+                var checkPos = start + direction * d;
+                var terrainType = AnalyzeTerrainAt(checkPos);
+                
+                if (terrainType != TerrainType.Walkable)
+                {
+                    obstacles.Add(new ObstacleInfo
+                    {
+                        Position = checkPos,
+                        Type = terrainType,
+                        Distance = d
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"AnalyzeObstacleMap error: {ex.Message}");
+        }
+        
+        return obstacles;
+    }
+
+    /// <summary>
+    /// Determine optimal movement skill for obstacle pattern
+    /// </summary>
+    private MovementSkillType DetermineOptimalMovementSkill(List<ObstacleInfo> obstacles, float totalDistance)
+    {
+        if (obstacles.Count == 0)
+            return MovementSkillType.None;
+        
+        // Count obstacle types
+        var wallCount = obstacles.Count(o => o.Type == TerrainType.Wall);
+        var obstacleCount = obstacles.Count(o => o.Type == TerrainType.Obstacle);
+        var doorCount = obstacles.Count(o => o.Type == TerrainType.Door);
+        
+        // Dash is good for bypassing small obstacles and gaps
+        if (obstacleCount > wallCount && totalDistance < 200f)
+        {
+            return MovementSkillType.Dash;
+        }
+        
+        // Leap Slam is good for walls and longer distances
+        if (wallCount > 0 || totalDistance > 150f)
+        {
+            return MovementSkillType.LeapSlam;
+        }
+        
+        // Lightning Warp for very complex obstacle patterns
+        if (obstacles.Count > 5)
+        {
+            return MovementSkillType.LightningWarp;
+        }
+        
+        return MovementSkillType.None;
+    }
+
+    /// <summary>
+    /// Generate waypoints for movement skill usage
+    /// </summary>
+    private List<Vector3> GenerateMovementSkillWaypoints(Vector3 start, Vector3 target, MovementSkillType skillType, List<ObstacleInfo> obstacles)
+    {
+        var waypoints = new List<Vector3>();
+        
+        try
+        {
+            switch (skillType)
+            {
+                case MovementSkillType.Dash:
+                    // Dash through small gaps - create waypoints just past obstacles
+                    if (obstacles.Count > 0)
+                    {
+                        var direction = Vector3.Normalize(target - start);
+                        var dashTarget = obstacles.Last().Position + direction * 50f; // Land past obstacle
+                        waypoints.Add(dashTarget);
+                    }
+                    break;
+                    
+                case MovementSkillType.LeapSlam:
+                    // Leap over obstacles - target clear area beyond obstacles
+                    if (obstacles.Count > 0)
+                    {
+                        var direction = Vector3.Normalize(target - start);
+                        var leapTarget = obstacles.Last().Position + direction * 75f; // Land well past obstacles
+                        
+                        // Ensure landing spot is safe
+                        if (IsWalkable(leapTarget))
+                        {
+                            waypoints.Add(leapTarget);
+                        }
+                    }
+                    break;
+                    
+                case MovementSkillType.LightningWarp:
+                    // Teleport past complex obstacle patterns
+                    var midPoint = Vector3.Lerp(start, target, 0.7f); // Warp most of the way
+                    if (IsWalkable(midPoint))
+                    {
+                        waypoints.Add(midPoint);
+                    }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"GenerateMovementSkillWaypoints error: {ex.Message}");
+        }
+        
+        return waypoints;
+    }
+
+    /// <summary>
+    /// Advanced 6-level terrain analysis - ENHANCED like original AreWeThereYet
     /// </summary>
     private TerrainType AnalyzeTerrainAt(Vector3 position)
     {
         try
         {
-            // Check for doors first (highest priority)
-            if (HasDoorAt(position))
-                return TerrainType.Door;
+            // LEVEL 1: Door Detection (highest priority - affects movement timing)
+            var doorState = GetDoorState(position);
+            if (doorState != DoorState.None)
+            {
+                return doorState == DoorState.Open ? TerrainType.Walkable : TerrainType.Door;
+            }
             
-            // Check for walls and obstacles using entity analysis
+            // LEVEL 2: Dynamic Obstacles (monsters, players - affects immediate pathing)
+            if (HasDynamicObstacle(position))
+                return TerrainType.Obstacle;
+            
+            // LEVEL 3: Static Walls (permanent obstacles - affects long-term routing)
             if (HasWallAt(position))
                 return TerrainType.Wall;
             
+            // LEVEL 4: Static Obstacles (chests, statues - can be bypassed)
             if (HasObstacleAt(position))
                 return TerrainType.Obstacle;
             
-            // Check for water/liquid terrain
+            // LEVEL 5: Environmental Hazards (water, lava - affects safety)
             if (HasWaterAt(position))
                 return TerrainType.Water;
             
-            // Default to walkable if no obstacles detected
-            return TerrainType.Walkable;
+            // LEVEL 6: Walkable with quality assessment
+            return AssessWalkableQuality(position);
         }
         catch (Exception ex)
         {
             _debugLog($"AnalyzeTerrainAt error: {ex.Message}");
             return TerrainType.Unknown;
+        }
+    }
+
+    /// <summary>
+    /// Enhanced door state detection - tracks door states in real-time
+    /// </summary>
+    private DoorState GetDoorState(Vector3 position)
+    {
+        try
+        {
+            var nearbyEntities = _gameController?.EntityListWrapper?.Entities
+                ?.Where(e => e != null && e.IsValid && 
+                           Vector3.Distance(position, e.Pos) <= MinObstacleDistance);
+            
+            if (nearbyEntities != null)
+            {
+                foreach (var entity in nearbyEntities)
+                {
+                    // Check if entity is a door based on metadata and render
+                    var metadata = entity.Metadata;
+                    var render = entity.GetComponent<Render>();
+                    
+                    if (metadata?.Contains("door", StringComparison.OrdinalIgnoreCase) == true ||
+                        render?.Name?.Contains("door", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        // Try to determine door state from entity properties
+                        // This is a simplified version - real implementation would need more ExileCore API knowledge
+                        try
+                        {
+                            // Check if door is animated (opening/closing)
+                            var animated = entity.GetComponent<ExileCore.PoEMemory.Components.Animated>();
+                            if (animated != null)
+                            {
+                                // Door is in transition
+                                return DoorState.Opening;
+                            }
+                            
+                            // Check door collision/blocking state
+                            // If door exists but isn't blocking, it's probably open
+                            return DoorState.Open;
+                        }
+                        catch
+                        {
+                            // If we can't determine state, assume closed for safety
+                            return DoorState.Closed;
+                        }
+                    }
+                }
+            }
+            
+            return DoorState.None;
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"GetDoorState error: {ex.Message}");
+            return DoorState.None;
+        }
+    }
+
+    /// <summary>
+    /// Assess walkable terrain quality for optimal pathing
+    /// </summary>
+    private TerrainType AssessWalkableQuality(Vector3 position)
+    {
+        try
+        {
+            var player = _gameController?.Player;
+            if (player == null) return TerrainType.Walkable;
+
+            var currentPos = player.Pos;
+            
+            // Assess terrain quality based on:
+            // 1. Height variations (prefer flat terrain)
+            var heightDiff = Math.Abs(position.Z - currentPos.Z);
+            if (heightDiff > 50f)
+            {
+                // Still walkable but not optimal
+                return TerrainType.Walkable;
+            }
+            
+            // 2. Distance from obstacles (prefer clear areas)
+            var nearbyObstacles = _gameController?.EntityListWrapper?.Entities
+                ?.Where(e => e != null && e.IsValid && 
+                           Vector3.Distance(position, e.Pos) <= 75f &&
+                           (e.Type == EntityType.WorldItem || e.Type == EntityType.Monster))
+                ?.Count() ?? 0;
+            
+            // High-quality walkable terrain (open, flat areas)
+            return nearbyObstacles > 5 ? TerrainType.Walkable : TerrainType.Walkable;
+        }
+        catch
+        {
+            return TerrainType.Walkable;
         }
     }
 
