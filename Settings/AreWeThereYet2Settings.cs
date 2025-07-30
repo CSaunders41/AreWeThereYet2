@@ -15,6 +15,9 @@ public class AreWeThereYet2Settings : ISettings
     [Menu("Party Settings", "Party and leader detection settings")]
     public EmptyNode PartyHeader { get; set; } = new EmptyNode();
 
+    [Menu("Enable Following")]
+    public ToggleNode EnableFollowing { get; set; } = new ToggleNode(false);
+
     [Menu("Auto-detect Party Leader")]
     public ToggleNode AutoDetectLeader { get; set; } = new ToggleNode(true);
 
@@ -47,4 +50,16 @@ public class AreWeThereYet2Settings : ISettings
 
     [Menu("Circuit Breaker Timeout (minutes)")]
     public RangeNode<int> CircuitBreakerTimeout { get; set; } = new RangeNode<int>(5, 1, 30);
+
+    [Menu("Overlay Settings", "On-screen task status display")]
+    public EmptyNode OverlayHeader { get; set; } = new EmptyNode();
+
+    [Menu("Show Task Overlay")]
+    public ToggleNode ShowTaskOverlay { get; set; } = new ToggleNode(true);
+
+    [Menu("Overlay X Position")]
+    public RangeNode<int> OverlayX { get; set; } = new RangeNode<int>(10, 0, 1920);
+
+    [Menu("Overlay Y Position")]
+    public RangeNode<int> OverlayY { get; set; } = new RangeNode<int>(200, 0, 1080);
 } 

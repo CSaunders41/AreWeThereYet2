@@ -89,7 +89,7 @@ public class MovementManager : IDisposable
                 return false;
 
             // Settings must allow following
-            if (!_settings?.Enable?.Value == true)
+            if (!_settings?.EnableFollowing?.Value == true)
                 return false;
 
             return true;
