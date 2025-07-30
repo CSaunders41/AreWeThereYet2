@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using ExileCore;
 using ExileCore.PoEMemory.MemoryObjects;
+using ExileCore.PoEMemory.Components;
+using ExileCore.Shared.Enums;
 using SharpDX;
 
 namespace AreWeThereYet2.Movement.Pathfinding;
@@ -81,27 +83,43 @@ public class PredictiveMovement : IPathfinding
     }
 
     /// <summary>
-    /// Check if direct path is walkable - simplified version focused on major obstacles only
+    /// Check if direct path is walkable - NOW USES EXILECORE MEMORY for obstacle detection
     /// </summary>
     public bool IsDirectPathWalkable(Vector3 start, Vector3 target)
     {
         try
         {
             var distance = Vector3.Distance(start, target);
-            
-            // For aggressive following, be very permissive about "walkable"
-            // Only block truly impossible paths
-            if (distance > 2000f) return false; // Ridiculously far
-            
             var heightDiff = Math.Abs(target.Z - start.Z);
-            if (heightDiff > 300f) return false; // Massive height difference
             
-            // For predictive movement, assume most paths are walkable
-            // Let obstacle avoidance handle specific issues
-            return true;
+            // Basic distance/height checks first
+            if (distance > 800f || heightDiff > 150f)
+                return false;
+                
+            // SHORT PATH: For close targets, do minimal checking for speed
+            if (distance < 80f)
+                return !HasMajorObstacleAt(target);
+                
+            // MEDIUM/LONG PATH: Check waypoints along the path using ExileCore memory
+            var numChecks = Math.Max(3, (int)(distance / 60f)); // Check every 60 units
+            for (int i = 1; i < numChecks; i++)
+            {
+                var t = (float)i / numChecks;
+                var checkPoint = Vector3.Lerp(start, target, t);
+                
+                // Use ExileCore memory to detect actual obstacles
+                if (HasMajorObstacleAt(checkPoint))
+                {
+                    _debugLog($"PREDICTIVE: Path blocked by obstacle at {checkPoint}");
+                    return false;
+                }
+            }
+            
+            return true; // Path is clear
         }
-        catch
+        catch (Exception ex)
         {
+            _debugLog($"PREDICTIVE IsDirectPathWalkable error: {ex.Message}");
             return true; // Assume walkable on error - better to move than get stuck
         }
     }
@@ -169,11 +187,31 @@ public class PredictiveMovement : IPathfinding
     }
 
     /// <summary>
-    /// Simple walkability check - very permissive to avoid over-analysis
+    /// Check if position is walkable - NOW USES EXILECORE MEMORY for obstacle detection
     /// </summary>
     public bool IsWalkable(Vector3 position)
     {
-        return IsBasicallySafe(position);
+        try
+        {
+            var player = _gameController?.Player;
+            if (player == null) return false;
+
+            var currentPos = player.Pos;
+            var distance = Vector3.Distance(currentPos, position);
+            var heightDiff = Math.Abs(position.Z - currentPos.Z);
+            
+            // Basic distance/height checks
+            if (distance > 1200f || heightDiff > 200f)
+                return false;
+                
+            // Use ExileCore memory to check for actual obstacles
+            return !HasMajorObstacleAt(position);
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"PREDICTIVE IsWalkable error: {ex.Message}");
+            return true; // Assume walkable on error
+        }
     }
 
     /// <summary>
@@ -344,6 +382,112 @@ public class PredictiveMovement : IPathfinding
     private class LeaderSnapshot
     {
         public Vector3 Position { get; set; }
-        public DateTime Timestamp { get; set; }
+        public DateTime Timestamp { get; set;         }
+    }
+    
+    /// <summary>
+    /// NEW: Check for major obstacles using ExileCore memory APIs
+    /// This is the key fix - actually use the game's memory data!
+    /// </summary>
+    private bool HasMajorObstacleAt(Vector3 position)
+    {
+        try
+        {
+            var entities = _gameController?.EntityListWrapper?.Entities;
+            if (entities == null) return false;
+            
+            const float obstacleRadius = 35f; // Check area around position
+            
+            foreach (var entity in entities)
+            {
+                if (entity?.Pos == null || !entity.IsValid) continue;
+                
+                var distance = Vector3.Distance(position, entity.Pos);
+                if (distance > obstacleRadius) continue;
+                
+                // Check for BLOCKING obstacles using entity types and components
+                if (IsEntityBlocking(entity))
+                {
+                    _debugLog($"PREDICTIVE: Obstacle detected - {entity.Type} at {entity.Pos}");
+                    return true;
+                }
+            }
+            
+            return false; // No blocking obstacles found
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"PREDICTIVE HasMajorObstacleAt error: {ex.Message}");
+            return false; // Assume no obstacles on error
+        }
+    }
+    
+    /// <summary>
+    /// NEW: Determine if an entity is a blocking obstacle using ExileCore components
+    /// </summary>
+    private bool IsEntityBlocking(Entity entity)
+    {
+        try
+        {
+            // 1. Check entity type for obvious obstacles
+            switch (entity.Type)
+            {
+                case EntityType.WorldItem:
+                    // Most world items (chests, statues) are obstacles
+                    return true;
+                    
+                case EntityType.Monster:
+                    // Only block for large/stationary monsters
+                    var life = entity.GetComponent<Life>();
+                    if (life?.CurHP > 0) // Alive monsters
+                    {
+                        // Block only for large monsters or bosses
+                        var render = entity.GetComponent<Render>();
+                        return render?.Name?.Contains("boss", StringComparison.OrdinalIgnoreCase) == true;
+                    }
+                    return false; // Dead monsters don't block
+                    
+                case EntityType.Player:
+                    return false; // Other players don't block movement
+                    
+                default:
+                    break;
+            }
+            
+            // 2. Check render component for walls/structures
+            var renderComp = entity.GetComponent<Render>();
+            if (renderComp?.Name != null)
+            {
+                var name = renderComp.Name.ToLowerInvariant();
+                
+                // Block for walls, doors (closed), large structures
+                if (name.Contains("wall") || name.Contains("barrier") || 
+                    name.Contains("pillar") || name.Contains("column"))
+                {
+                    return true;
+                }
+                
+                // Doors - assume closed doors block (simple approach)
+                if (name.Contains("door"))
+                {
+                    // TODO: Proper door state detection later
+                    return false; // For now, assume doors are passable
+                }
+            }
+            
+            // 3. Check metadata for additional obstacle types
+            var metadata = entity.Metadata;
+            if (metadata?.Contains("obstacle", StringComparison.OrdinalIgnoreCase) == true ||
+                metadata?.Contains("wall", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return true;
+            }
+            
+            return false; // Entity doesn't block movement
+        }
+        catch
+        {
+            return false; // Assume non-blocking on error
+        }
     }
 }
