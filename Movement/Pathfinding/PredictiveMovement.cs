@@ -168,20 +168,20 @@ public class PredictiveMovement : IPathfinding
             // STEP 2: NO LEADER DETECTED - FALLBACK TO TRADITIONAL PATHFINDING
             _debugLog($"NO LEADER DETECTED: Using traditional pathfinding to target position");
             
-            var distance = Vector3.Distance(currentPos, targetPos);
+            var fallbackDistance = Vector3.Distance(currentPos, targetPos);
             
             // If very close, move directly to target
-            if (distance <= 40f) return targetPos;
+            if (fallbackDistance <= 40f) return targetPos;
             
-            var direction = Vector3.Normalize(targetPos - currentPos);
+            var fallbackDirection = Vector3.Normalize(targetPos - currentPos);
             
             // Use standard steps when no leader detected
-            float stepSize = CalculateAggressiveStepSize(distance);
-            stepSize = Math.Min(stepSize, distance);
+            float fallbackStepSize = CalculateAggressiveStepSize(fallbackDistance);
+            fallbackStepSize = Math.Min(fallbackStepSize, fallbackDistance);
             
-            var candidatePoint = currentPos + (direction * stepSize);
+            var candidatePoint = currentPos + (fallbackDirection * fallbackStepSize);
             
-            _debugLog($"FALLBACK: Distance={distance:F1}, StepSize={stepSize:F1}");
+            _debugLog($"FALLBACK: Distance={fallbackDistance:F1}, StepSize={fallbackStepSize:F1}");
             
             // USE EXILECORE MEMORY - Check for actual obstacles
             if (!HasMajorObstacleAt(candidatePoint))
@@ -194,7 +194,7 @@ public class PredictiveMovement : IPathfinding
             
             foreach (var angle in avoidanceAngles)
             {
-                var avoidancePoint = currentPos + (RotateVector2D(direction, angle) * stepSize);
+                var avoidancePoint = currentPos + (RotateVector2D(fallbackDirection, angle) * fallbackStepSize);
                 if (!HasMajorObstacleAt(avoidancePoint))
                 {
                     _debugLog($"FALLBACK: Using {angle}° avoidance angle");
@@ -204,7 +204,7 @@ public class PredictiveMovement : IPathfinding
             
             // Final fallback - small step forward
             var microStep = Math.Min(MinStepSize * 0.5f, 30f);
-            var microPoint = currentPos + (direction * microStep);
+            var microPoint = currentPos + (fallbackDirection * microStep);
             _debugLog($"FALLBACK: Micro-step {microStep:F1} units");
             return microPoint;
         }
