@@ -111,8 +111,17 @@ public class MovementManager : IDisposable
             var player = _gameController.Player;
             var leader = _partyManager.GetPartyLeader();
 
-            if (player == null || leader == null)
+            if (player == null)
+            {
+                // Debug: Player is null
                 return;
+            }
+
+            if (leader == null)
+            {
+                // Debug: Leader is null
+                return;
+            }
 
             // Calculate distance to leader
             var playerPos = player.Pos;
@@ -122,10 +131,19 @@ public class MovementManager : IDisposable
             // Get follow distance from settings
             var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
 
-            // If we're too far from leader, create a movement task
+            // Debug logging - this will show up in error manager if something goes wrong
             if (distance > followDistance)
             {
+                // We should create a follow task here
                 CreateFollowTask(leaderPos, distance);
+            }
+            else
+            {
+                // We're close enough - remove any existing follow task
+                if (_taskManager.HasTask("follow_leader"))
+                {
+                    _taskManager.RemoveTask("follow_leader");
+                }
             }
         }
         catch (Exception ex)
@@ -143,10 +161,20 @@ public class MovementManager : IDisposable
         {
             // Don't create duplicate follow tasks
             if (_taskManager.HasTask("follow_leader"))
+            {
+                // Debug: Task already exists
                 return;
+            }
 
             // Create follow task
             var taskDescription = $"Follow leader (distance: {currentDistance:F1})";
+            
+            // Log task creation attempt
+            var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
+            
+            // Force an error to see this in the debug info
+            _errorManager.HandleError("MovementManager.Debug", 
+                new Exception($"Creating follow task: distance={currentDistance:F1}, threshold={followDistance:F1}"));
             
             _taskManager.AddTask(
                 "follow_leader",
@@ -157,6 +185,18 @@ public class MovementManager : IDisposable
                 TimeSpan.FromSeconds(10), // 10 second timeout
                 maxRetries: 2
             );
+            
+            // Verify task was created
+            if (_taskManager.HasTask("follow_leader"))
+            {
+                _errorManager.HandleError("MovementManager.Debug", 
+                    new Exception("Follow task created successfully"));
+            }
+            else
+            {
+                _errorManager.HandleError("MovementManager.Debug", 
+                    new Exception("Follow task creation FAILED"));
+            }
         }
         catch (Exception ex)
         {

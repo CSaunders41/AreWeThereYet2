@@ -299,6 +299,23 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 {
                     ImGui.TextColored(new System.Numerics.Vector4(1, 0, 0, 1), $"Errors: {errorCount}");
                 }
+
+                // Debug Information
+                if (Settings?.DebugMode?.Value == true)
+                {
+                    ImGui.Separator();
+                    ImGui.TextColored(new System.Numerics.Vector4(1, 1, 0, 1), "DEBUG INFO:");
+                    
+                    // Movement Manager Debug
+                    if (_movementManager != null)
+                    {
+                        var debugInfo = GetMovementDebugInfo();
+                        foreach (var info in debugInfo)
+                        {
+                            ImGui.Text(info);
+                        }
+                    }
+                }
             }
             ImGui.End();
         }
@@ -306,6 +323,62 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
         {
             _errorManager?.HandleError("RenderTaskOverlay", ex);
         }
+    }
+
+    /// <summary>
+    /// Get debug information for movement system
+    /// </summary>
+    private List<string> GetMovementDebugInfo()
+    {
+        var debug = new List<string>();
+        
+        try
+        {
+            // Basic game state
+            debug.Add($"InGame: {GameController?.Game?.IngameState?.InGame}");
+            debug.Add($"Player: {(GameController?.Player != null ? "Yes" : "No")}");
+            
+            // Following settings
+            debug.Add($"EnableFollowing: {Settings?.EnableFollowing?.Value}");
+            debug.Add($"MaxFollowDistance: {Settings?.MaxFollowDistance?.Value}");
+            
+            // Party and leader info
+            if (_partyManager != null)
+            {
+                debug.Add($"IsInParty: {_partyManager.IsInParty()}");
+                var leader = _partyManager.GetPartyLeader();
+                debug.Add($"Leader: {(leader != null ? "Found" : "None")}");
+                
+                if (leader != null)
+                {
+                    var playerComponent = leader.GetComponent<Player>();
+                    debug.Add($"LeaderName: {playerComponent?.PlayerName ?? "Unknown"}");
+                }
+            }
+            
+            // Distance calculation
+            if (_movementManager != null)
+            {
+                var distance = _movementManager.GetDistanceToLeader();
+                debug.Add($"Distance: {(distance.HasValue ? distance.Value.ToString("F1") : "N/A")}");
+                debug.Add($"IsFollowing: {_movementManager.IsFollowing()}");
+            }
+            
+            // Task manager info
+            if (_taskManager != null)
+            {
+                debug.Add($"ActiveTasks: {_taskManager.GetActiveTaskCount()}");
+                var currentTask = _taskManager.GetCurrentTask();
+                debug.Add($"CurrentTask: {currentTask?.Description ?? "None"}");
+                debug.Add($"HasFollowTask: {_taskManager.HasTask("follow_leader")}");
+            }
+        }
+        catch (Exception ex)
+        {
+            debug.Add($"Debug Error: {ex.Message}");
+        }
+        
+        return debug;
     }
 
     /// <summary>
