@@ -15,7 +15,9 @@ public class PartyManager : IDisposable
     private readonly GameController _gameController;
     private readonly ErrorManager _errorManager;
     private Entity? _currentLeader;
+    private Entity? _manualLeader;
     private List<Entity> _partyMembers;
+    private List<Entity> _nearbyPlayers;
     private DateTime _lastPartyUpdate;
     private bool _disposed;
 
@@ -28,6 +30,7 @@ public class PartyManager : IDisposable
         _gameController = gameController;
         _errorManager = errorManager;
         _partyMembers = new List<Entity>();
+        _nearbyPlayers = new List<Entity>();
         _lastPartyUpdate = DateTime.MinValue;
     }
 
@@ -48,8 +51,11 @@ public class PartyManager : IDisposable
 
             // Update party member list
             UpdatePartyMembers();
+            
+            // Update nearby players list (for manual selection)
+            UpdateNearbyPlayers();
 
-            // Auto-detect leader if in party
+            // Auto-detect leader if in party and no manual override
             if (IsInParty())
             {
                 AutoDetectLeader();
@@ -92,11 +98,11 @@ public class PartyManager : IDisposable
     }
 
     /// <summary>
-    /// Get the current party leader
+    /// Get the current party leader (manual override takes priority)
     /// </summary>
     public Entity? GetPartyLeader()
     {
-        return _currentLeader;
+        return _manualLeader ?? _currentLeader;
     }
 
     /// <summary>
@@ -131,6 +137,98 @@ public class PartyManager : IDisposable
     public void ClearLeader()
     {
         _currentLeader = null;
+        _manualLeader = null;
+    }
+
+    /// <summary>
+    /// Set manual leader by player name
+    /// </summary>
+    public bool SetManualLeader(string playerName)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(playerName))
+            {
+                _manualLeader = null;
+                return true;
+            }
+
+            // Find player by name in nearby players
+            var targetPlayer = _nearbyPlayers.FirstOrDefault(p => 
+            {
+                try
+                {
+                    var player = p.GetComponent<Player>();
+                    return player?.PlayerName?.Equals(playerName, StringComparison.OrdinalIgnoreCase) == true;
+                }
+                catch
+                {
+                    return false;
+                }
+            });
+
+            _manualLeader = targetPlayer;
+            return targetPlayer != null;
+        }
+        catch (Exception ex)
+        {
+            _errorManager.HandleError("PartyManager.SetManualLeader", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Get all nearby players for manual selection
+    /// </summary>
+    public List<string> GetNearbyPlayerNames()
+    {
+        try
+        {
+            var playerNames = new List<string>();
+            
+            foreach (var entity in _nearbyPlayers)
+            {
+                try
+                {
+                    var player = entity.GetComponent<Player>();
+                    if (player?.PlayerName != null && !string.IsNullOrEmpty(player.PlayerName))
+                    {
+                        playerNames.Add(player.PlayerName);
+                    }
+                }
+                catch
+                {
+                    // Skip invalid entities
+                    continue;
+                }
+            }
+
+            return playerNames.Distinct().OrderBy(name => name).ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorManager.HandleError("PartyManager.GetNearbyPlayerNames", ex);
+            return new List<string>();
+        }
+    }
+
+    /// <summary>
+    /// Get the current manual leader name (if set)
+    /// </summary>
+    public string? GetManualLeaderName()
+    {
+        try
+        {
+            if (_manualLeader == null) return null;
+            
+            var player = _manualLeader.GetComponent<Player>();
+            return player?.PlayerName;
+        }
+        catch (Exception ex)
+        {
+            _errorManager.HandleError("PartyManager.GetManualLeaderName", ex);
+            return null;
+        }
     }
 
     /// <summary>
@@ -156,6 +254,52 @@ public class PartyManager : IDisposable
         {
             _errorManager.HandleError("PartyManager.GetDistanceToLeader", ex);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Update the list of nearby players (for manual selection)
+    /// </summary>
+    private void UpdateNearbyPlayers()
+    {
+        try
+        {
+            _nearbyPlayers.Clear();
+
+            var entities = _gameController?.EntityListWrapper?.ValidEntitiesByType[ExileCore.Shared.Enums.EntityType.Player];
+            if (entities == null) return;
+
+            var player = _gameController?.Player;
+            if (player == null) return;
+
+            // Find all player entities within reasonable distance
+            foreach (var entity in entities)
+            {
+                try
+                {
+                    if (entity == null || entity == player) continue;
+
+                    // Check if entity has a valid player component
+                    var playerComponent = entity.GetComponent<Player>();
+                    if (playerComponent?.PlayerName == null) continue;
+
+                    // Add to nearby players list (we'll filter by distance if needed)
+                    var distance = GetDistanceBetweenEntities(player, entity);
+                    if (distance <= 200f) // Reasonable range for leader selection
+                    {
+                        _nearbyPlayers.Add(entity);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _errorManager.HandleError($"PartyManager.UpdateNearbyPlayers.EntityCheck", ex);
+                    continue;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorManager.HandleError("PartyManager.UpdateNearbyPlayers", ex);
         }
     }
 
@@ -373,7 +517,9 @@ public class PartyManager : IDisposable
         if (_disposed) return;
 
         _partyMembers.Clear();
+        _nearbyPlayers.Clear();
         _currentLeader = null;
+        _manualLeader = null;
         _disposed = true;
     }
 } 

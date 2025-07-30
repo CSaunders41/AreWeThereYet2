@@ -18,6 +18,9 @@ public class AreWeThereYet2Settings : ISettings
     [Menu("Auto-detect Party Leader")]
     public ToggleNode AutoDetectLeader { get; set; } = new ToggleNode(true);
 
+    [Menu("Manual Leader Name (overrides auto-detect)")]
+    public TextNode ManualLeaderName { get; set; } = new TextNode("");
+
     [Menu("Leader Detection Update Interval (ms)")]
     public RangeNode<int> LeaderUpdateInterval { get; set; } = new RangeNode<int>(1000, 500, 5000);
 

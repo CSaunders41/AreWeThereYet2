@@ -55,6 +55,9 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             _partyManager?.Update();
             _movementManager?.Update();
             
+            // Sync manual leader setting
+            SyncManualLeaderSetting();
+            
             // Process tasks
             _taskManager?.ProcessNextTask();
         }
@@ -76,12 +79,63 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             if (_partyManager != null)
             {
                 ImGui.Text($"Party Status: {(_partyManager.IsInParty() ? "In Party" : "Solo")}");
-                if (_partyManager.IsInParty())
+                
+                // Manual Leader Selection
+                var nearbyPlayers = _partyManager.GetNearbyPlayerNames();
+                if (nearbyPlayers.Count > 0)
                 {
-                    var leader = _partyManager.GetPartyLeader();
-                    ImGui.Text($"Leader: {leader?.GetComponent<Player>()?.PlayerName ?? "Auto-detecting..."}");
+                    ImGui.Text("Select Leader:");
                     
-                    // Show distance to leader
+                    // Get current manual leader or empty
+                    var currentManualLeader = Settings?.ManualLeaderName?.Value ?? "";
+                    
+                    if (ImGui.BeginCombo("##LeaderSelect", string.IsNullOrEmpty(currentManualLeader) ? "Auto-detect" : currentManualLeader))
+                    {
+                        // Auto-detect option
+                        if (ImGui.Selectable("Auto-detect", string.IsNullOrEmpty(currentManualLeader)))
+                        {
+                            if (Settings?.ManualLeaderName != null)
+                            {
+                                Settings.ManualLeaderName.Value = "";
+                                _partyManager.SetManualLeader("");
+                            }
+                        }
+                        
+                        // Player options
+                        foreach (var playerName in nearbyPlayers)
+                        {
+                            bool isSelected = currentManualLeader.Equals(playerName, StringComparison.OrdinalIgnoreCase);
+                            if (ImGui.Selectable(playerName, isSelected))
+                            {
+                                if (Settings?.ManualLeaderName != null)
+                                {
+                                    Settings.ManualLeaderName.Value = playerName;
+                                    _partyManager.SetManualLeader(playerName);
+                                }
+                            }
+                        }
+                        
+                        ImGui.EndCombo();
+                    }
+                }
+                
+                // Show current leader info
+                var leader = _partyManager.GetPartyLeader();
+                var leaderName = leader?.GetComponent<Player>()?.PlayerName ?? "None";
+                var manualLeaderName = _partyManager.GetManualLeaderName();
+                
+                if (!string.IsNullOrEmpty(manualLeaderName))
+                {
+                    ImGui.TextColored(new System.Numerics.Vector4(0, 1, 1, 1), $"Leader: {manualLeaderName} (Manual)");
+                }
+                else if (_partyManager.IsInParty())
+                {
+                    ImGui.Text($"Leader: {leaderName} (Auto)");
+                }
+                
+                // Show distance to leader
+                if (leader != null)
+                {
                     var distance = _movementManager?.GetDistanceToLeader();
                     if (distance.HasValue)
                     {
@@ -122,6 +176,31 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
         catch (Exception ex)
         {
             LogError($"Error in DrawSettings: {ex.Message}", 1);
+        }
+    }
+
+    /// <summary>
+    /// Sync manual leader setting with PartyManager
+    /// </summary>
+    private void SyncManualLeaderSetting()
+    {
+        try
+        {
+            if (_partyManager == null || Settings?.ManualLeaderName == null)
+                return;
+
+            var settingValue = Settings.ManualLeaderName.Value ?? "";
+            var currentManualLeader = _partyManager.GetManualLeaderName() ?? "";
+
+            // If setting changed, update party manager
+            if (!settingValue.Equals(currentManualLeader, StringComparison.OrdinalIgnoreCase))
+            {
+                _partyManager.SetManualLeader(settingValue);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorManager?.HandleError("SyncManualLeaderSetting", ex);
         }
     }
 
