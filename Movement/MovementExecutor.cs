@@ -140,12 +140,12 @@ public class MovementExecutor : IDisposable
                 var nextPoint = _pathfinding.GetNextMovePoint(currentPos, finalTarget);
                 if (nextPoint.HasValue)
                 {
-                    var screenPos = Mouse.WorldToScreen(nextPoint.Value, _gameController);
-                    if (screenPos != Vector2.Zero)
+                    var directStepScreenPos = Mouse.WorldToScreen(nextPoint.Value, _gameController);
+                    if (directStepScreenPos != Vector2.Zero)
                     {
                         var stepDistance = Vector3.Distance(currentPos, nextPoint.Value);
                         _debugLog($"MOVEMENT: DIRECT STEP to leader - {stepDistance:F1} units toward {finalTarget}");
-                        await Mouse.ClickAt(screenPos, 150); // Faster movement for direct paths
+                        await Mouse.ClickAt(directStepScreenPos, 150); // Faster movement for direct paths
                         return true;
                     }
                 }
@@ -184,16 +184,16 @@ public class MovementExecutor : IDisposable
             }
 
             // Convert world position to screen coordinates for mouse movement
-            var screenPos = Mouse.WorldToScreen(targetWaypoint, _gameController);
-            if (screenPos == Vector2.Zero)
+            var waypointScreenPos = Mouse.WorldToScreen(targetWaypoint, _gameController);
+            if (waypointScreenPos == Vector2.Zero)
             {
                 _debugLog("MOVEMENT: Failed to convert world to screen coordinates");
                 return false;
             }
 
             // Execute mouse movement and click
-            _debugLog($"MOVEMENT: WAYPOINT CLICK to {screenPos} (world: {targetWaypoint})");
-            await Mouse.ClickAt(screenPos, 200); // 200ms movement duration
+            _debugLog($"MOVEMENT: WAYPOINT CLICK to {waypointScreenPos} (world: {targetWaypoint})");
+            await Mouse.ClickAt(waypointScreenPos, 200); // 200ms movement duration
 
             return true; // Movement command executed
         }
