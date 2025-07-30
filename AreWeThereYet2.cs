@@ -32,7 +32,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             // Initialize core managers
             _errorManager = new ErrorManager();
             _taskManager = new TaskManager(_errorManager);
-            _partyManager = new PartyManager(GameController, _errorManager);
+            _partyManager = new PartyManager(GameController, _errorManager, Settings);
             _movementManager = new MovementManager(GameController, _taskManager, _partyManager, _errorManager, Settings, DebugLog);
             
             Name = "AreWeThereYet2";

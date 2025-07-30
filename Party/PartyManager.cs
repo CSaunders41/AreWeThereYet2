@@ -4,6 +4,7 @@ using ExileCore.PoEMemory.MemoryObjects;
 using ExileCore.PoEMemory.Elements;
 using ExileCore.Shared.Enums;
 using AreWeThereYet2.Core;
+using AreWeThereYet2.Settings;
 
 namespace AreWeThereYet2.Party;
 
@@ -14,24 +15,30 @@ public class PartyManager : IDisposable
 {
     private readonly GameController _gameController;
     private readonly ErrorManager _errorManager;
+    private readonly AreWeThereYet2Settings _settings;
     private Entity? _currentLeader;
     private Entity? _manualLeader;
     private List<Entity> _partyMembers;
     private List<Entity> _nearbyPlayers;
     private DateTime _lastPartyUpdate;
+    private string? _lastKnownManualLeaderName; // Track the last manual leader name
     private bool _disposed;
 
     // Auto-detection settings
     private const int UpdateIntervalMs = 1000; // Update every second
     private const float MaxFollowDistance = 100f; // Max distance to consider following
 
-    public PartyManager(GameController gameController, ErrorManager errorManager)
+    public PartyManager(GameController gameController, ErrorManager errorManager, AreWeThereYet2Settings settings)
     {
         _gameController = gameController;
         _errorManager = errorManager;
+        _settings = settings;
         _partyMembers = new List<Entity>();
         _nearbyPlayers = new List<Entity>();
         _lastPartyUpdate = DateTime.MinValue;
+        
+        // Initialize with any existing manual leader name from settings
+        _lastKnownManualLeaderName = _settings.ManualLeaderName?.Value;
     }
 
     /// <summary>
@@ -54,6 +61,9 @@ public class PartyManager : IDisposable
             
             // Update nearby players list (for manual selection)
             UpdateNearbyPlayers();
+
+            // FIXED: Handle manual leader persistence across area transitions
+            RestoreManualLeaderIfNeeded();
 
             // Auto-detect leader if in party and no manual override
             if (IsInParty())
@@ -102,7 +112,11 @@ public class PartyManager : IDisposable
     /// </summary>
     public Entity? GetPartyLeader()
     {
-        return _manualLeader ?? _currentLeader;
+        // FIXED: Manual leader always takes priority if set
+        if (_manualLeader != null && _manualLeader.IsValid)
+            return _manualLeader;
+            
+        return _currentLeader;
     }
 
     /// <summary>
@@ -141,7 +155,7 @@ public class PartyManager : IDisposable
     }
 
     /// <summary>
-    /// Set manual leader by player name
+    /// Set manual leader by player name - FIXED: Persists across area transitions
     /// </summary>
     public bool SetManualLeader(string playerName)
     {
@@ -149,9 +163,16 @@ public class PartyManager : IDisposable
         {
             if (string.IsNullOrEmpty(playerName))
             {
+                // Clear manual leader
                 _manualLeader = null;
+                _lastKnownManualLeaderName = null;
+                _settings.ManualLeaderName.Value = "";
                 return true;
             }
+
+            // FIXED: Store the name in settings for persistence across area transitions
+            _settings.ManualLeaderName.Value = playerName;
+            _lastKnownManualLeaderName = playerName;
 
             // Find player by name in nearby players
             var targetPlayer = _nearbyPlayers.FirstOrDefault(p => 
@@ -168,7 +189,10 @@ public class PartyManager : IDisposable
             });
 
             _manualLeader = targetPlayer;
-            return targetPlayer != null;
+            
+            // Even if we can't find them right now, consider it successful 
+            // because the name is stored and will be restored when they're available
+            return true;
         }
         catch (Exception ex)
         {
@@ -512,6 +536,87 @@ public class PartyManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// Restore manual leader after area transitions - CRITICAL for leader persistence
+    /// </summary>
+    private void RestoreManualLeaderIfNeeded()
+    {
+        try
+        {
+            // Get the current manual leader name from settings
+            var currentSettingsName = _settings.ManualLeaderName?.Value;
+            
+            // If no manual leader is set in settings, clear everything
+            if (string.IsNullOrEmpty(currentSettingsName))
+            {
+                if (_manualLeader != null)
+                {
+                    _manualLeader = null;
+                    _lastKnownManualLeaderName = null;
+                }
+                return;
+            }
+
+            // Update our cached name if settings changed
+            if (_lastKnownManualLeaderName != currentSettingsName)
+            {
+                _lastKnownManualLeaderName = currentSettingsName;
+                _manualLeader = null; // Force re-find
+            }
+
+            // If we have a manual leader and it's still valid, we're good
+            if (_manualLeader != null && _manualLeader.IsValid)
+            {
+                // Double-check the name matches (in case the entity changed)
+                try
+                {
+                    var currentLeaderName = _manualLeader.GetComponent<Player>()?.PlayerName;
+                    if (currentLeaderName?.Equals(_lastKnownManualLeaderName, StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        return; // All good, leader is still valid
+                    }
+                    else
+                    {
+                        // Name doesn't match, need to re-find
+                        _manualLeader = null;
+                    }
+                }
+                catch
+                {
+                    // Can't read name, assume invalid
+                    _manualLeader = null;
+                }
+            }
+
+            // Try to find the manual leader by name in nearby players
+            if (_manualLeader == null && !string.IsNullOrEmpty(_lastKnownManualLeaderName))
+            {
+                var targetPlayer = _nearbyPlayers.FirstOrDefault(p => 
+                {
+                    try
+                    {
+                        var player = p.GetComponent<Player>();
+                        return player?.PlayerName?.Equals(_lastKnownManualLeaderName, StringComparison.OrdinalIgnoreCase) == true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                });
+
+                if (targetPlayer != null)
+                {
+                    _manualLeader = targetPlayer;
+                    // Log successful restoration (optional debug info)
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorManager.HandleError("PartyManager.RestoreManualLeaderIfNeeded", ex);
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -520,6 +625,7 @@ public class PartyManager : IDisposable
         _nearbyPlayers.Clear();
         _currentLeader = null;
         _manualLeader = null;
+        _lastKnownManualLeaderName = null;
         _disposed = true;
     }
 } 
