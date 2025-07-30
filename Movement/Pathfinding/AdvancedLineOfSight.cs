@@ -64,41 +64,34 @@ public class AdvancedLineOfSight : IPathfinding
                 return result;
             }
             
-            // FIXED: Only use waypoints when direct path is blocked AND distance is reasonable
-            if (distance <= MaxDirectPathDistance)
-            {
-                var waypoints = FindOptimalWaypoints(start, target);
-                if (waypoints.Count > 0)
-                {
-                    result.Success = true;
-                    result.Path = new List<Vector3> { start };
-                    result.Path.AddRange(waypoints);
-                    result.Path.Add(target);
-                    result.SimplifiedPath = new List<Vector3>(waypoints) { target };
-                    
-                    // Calculate total path distance
-                    result.Distance = 0f;
-                    for (int i = 0; i < result.Path.Count - 1; i++)
-                    {
-                        result.Distance += Vector3.Distance(result.Path[i], result.Path[i + 1]);
-                    }
-                    
-                    _debugLog($"ADVANCED: Waypoint path found: {waypoints.Count} waypoints, {result.Distance:F1} total distance");
-                    return result;
-                }
-            }
-            
-            // FIXED: For very far leaders, force direct movement even if line-of-sight isn't perfect
-            if (distance > MaxDirectPathDistance)
+            // REAL PATHFINDING: Try waypoint navigation for ANY distance when direct path is blocked
+            var waypoints = FindOptimalWaypoints(start, target);
+            if (waypoints.Count > 0)
             {
                 result.Success = true;
-                result.Path = new List<Vector3> { start, target };
-                result.SimplifiedPath = new List<Vector3> { target };
-                result.Distance = distance;
+                result.Path = new List<Vector3> { start };
+                result.Path.AddRange(waypoints);
+                result.Path.Add(target);
+                result.SimplifiedPath = new List<Vector3>(waypoints) { target };
                 
-                _debugLog($"ADVANCED: FORCED DIRECT - Leader very far ({distance:F1}), skipping waypoints");
+                // Calculate total path distance
+                result.Distance = 0f;
+                for (int i = 0; i < result.Path.Count - 1; i++)
+                {
+                    result.Distance += Vector3.Distance(result.Path[i], result.Path[i + 1]);
+                }
+                
+                _debugLog($"ADVANCED: Complex waypoint path found: {waypoints.Count} waypoints, {result.Distance:F1} total distance");
                 return result;
             }
+            
+            // FALLBACK: If pathfinding fails, try direct movement (obstacle detection might be wrong)
+            _debugLog($"ADVANCED: Pathfinding failed, falling back to direct movement: {distance:F1} units");
+            result.Success = true;
+            result.Path = new List<Vector3> { start, target };
+            result.SimplifiedPath = new List<Vector3> { target };
+            result.Distance = distance;
+            return result;
             
             // Phase 3: Fallback to entity-based navigation
             var fallbackPath = FindFallbackPath(start, target);
@@ -418,41 +411,207 @@ public class AdvancedLineOfSight : IPathfinding
     {
         try
         {
-            var waypoints = new List<Vector3>();
-            var direction = Vector3.Normalize(target - start);
-            var distance = Vector3.Distance(start, target);
+            _debugLog($"REAL PATHFINDING: Analyzing path from {start} to {target}");
             
-            // ENHANCED: Check if movement skills can bypass obstacles entirely
-            var movementSkillPath = AnalyzeMovementSkillPath(start, target);
-            if (movementSkillPath != null && movementSkillPath.Count > 0)
+            // Step 1: Analyze obstacles along the direct path
+            var obstacles = DetectObstaclesAlongPath(start, target);
+            if (obstacles.Count == 0)
             {
-                _debugLog($"ADVANCED: Movement skill path found with {movementSkillPath.Count} skill points");
-                return movementSkillPath;
+                _debugLog($"PATHFINDING: No obstacles detected, should use direct path");
+                return new List<Vector3>(); // Direct path should work
             }
             
-            // Traditional waypoint pathfinding
-            for (int attempt = 0; attempt < MaxWaypointAttempts; attempt++)
+            _debugLog($"PATHFINDING: Found {obstacles.Count} obstacles, generating waypoints");
+            
+            // Step 2: Generate waypoints to navigate around each obstacle  
+            var waypoints = new List<Vector3>();
+            var currentPos = start;
+            
+            foreach (var obstacle in obstacles)
             {
-                var angle = (attempt * 45f) - 180f; // Try different angles
-                var waypointDistance = Math.Min(WaypointSearchRadius, distance * 0.6f);
-                
-                var waypoint = FindStrategicWaypoint(start, target, direction, angle, waypointDistance);
-                
-                if (waypoint.HasValue && 
-                    IsDirectLineOfSightClear(start, waypoint.Value) &&
-                    IsDirectLineOfSightClear(waypoint.Value, target))
+                var obstacleWaypoints = GenerateWaypointsAroundObstacle(currentPos, target, obstacle);
+                if (obstacleWaypoints.Count > 0)
                 {
-                    waypoints.Add(waypoint.Value);
-                    _debugLog($"ADVANCED: Strategic waypoint found at {waypoint.Value}");
-                    break;
+                    waypoints.AddRange(obstacleWaypoints);
+                    currentPos = obstacleWaypoints.Last(); // Update current position
+                    _debugLog($"PATHFINDING: Added {obstacleWaypoints.Count} waypoints around obstacle at {obstacle}");
                 }
+            }
+            
+            // Step 3: Validate the complete path
+            if (ValidateWaypointPath(start, waypoints, target))
+            {
+                _debugLog($"PATHFINDING: Generated {waypoints.Count} waypoints for complex navigation");
+                return waypoints;
+            }
+            
+            // Step 4: Fallback - try simple angle-based waypoint generation
+            _debugLog($"PATHFINDING: Complex path failed, trying simple angle-based approach");
+            return GenerateSimpleAngleWaypoints(start, target);
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"FindOptimalWaypoints error: {ex.Message}");
+            return GenerateSimpleAngleWaypoints(start, target);
+        }
+    }
+
+    /// <summary>
+    /// REAL PATHFINDING: Detect obstacles along the direct path from start to target
+    /// Returns positions where obstacles are blocking the path
+    /// </summary>
+    private List<Vector3> DetectObstaclesAlongPath(Vector3 start, Vector3 target)
+    {
+        var obstacles = new List<Vector3>();
+        
+        try
+        {
+            var direction = Vector3.Normalize(target - start);
+            var distance = Vector3.Distance(start, target);
+            var currentPos = start;
+            var stepSize = 25f; // Check every 25 units for obstacles
+            
+            while (Vector3.Distance(currentPos, target) > stepSize)
+            {
+                currentPos += direction * stepSize;
+                
+                var terrainType = AnalyzeTerrainAt(currentPos);
+                if (!IsTerrainPassable(terrainType, currentPos))
+                {
+                    obstacles.Add(currentPos);
+                    _debugLog($"PATHFINDING: Obstacle detected at {currentPos} - {terrainType}");
+                }
+            }
+            
+            return obstacles;
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"DetectObstaclesAlongPath error: {ex.Message}");
+            return obstacles;
+        }
+    }
+
+    /// <summary>
+    /// Generate waypoints to navigate around a specific obstacle
+    /// </summary>
+    private List<Vector3> GenerateWaypointsAroundObstacle(Vector3 start, Vector3 target, Vector3 obstaclePos)
+    {
+        var waypoints = new List<Vector3>();
+        
+        try
+        {
+            var toTarget = Vector3.Normalize(target - start);
+            var toObstacle = Vector3.Normalize(obstaclePos - start);
+            
+            // Try waypoints to the left and right of the obstacle
+            var leftAngle = 90f;  // 90 degrees left
+            var rightAngle = -90f; // 90 degrees right
+            var waypointDistance = 100f; // Distance to place waypoints from obstacle
+            
+            // Left waypoint
+            var leftDirection = RotateVector(toObstacle, leftAngle);
+            var leftWaypoint = obstaclePos + (leftDirection * waypointDistance);
+            
+            // Right waypoint  
+            var rightDirection = RotateVector(toObstacle, rightAngle);
+            var rightWaypoint = obstaclePos + (rightDirection * waypointDistance);
+            
+            // Test which waypoint works better
+            if (IsBasicallySafe(leftWaypoint) && IsDirectLineOfSightClear(start, leftWaypoint))
+            {
+                waypoints.Add(leftWaypoint);
+                _debugLog($"PATHFINDING: Left waypoint around obstacle: {leftWaypoint}");
+            }
+            else if (IsBasicallySafe(rightWaypoint) && IsDirectLineOfSightClear(start, rightWaypoint))
+            {
+                waypoints.Add(rightWaypoint);
+                _debugLog($"PATHFINDING: Right waypoint around obstacle: {rightWaypoint}");
             }
             
             return waypoints;
         }
         catch (Exception ex)
         {
-            _debugLog($"FindOptimalWaypoints error: {ex.Message}");
+            _debugLog($"GenerateWaypointsAroundObstacle error: {ex.Message}");
+            return waypoints;
+        }
+    }
+
+    /// <summary>
+    /// Validate that a waypoint path is actually walkable
+    /// </summary>
+    private bool ValidateWaypointPath(Vector3 start, List<Vector3> waypoints, Vector3 target)
+    {
+        try
+        {
+            if (waypoints.Count == 0)
+                return false;
+            
+            // Check path from start to first waypoint
+            var currentPos = start;
+            
+            foreach (var waypoint in waypoints)
+            {
+                if (!IsDirectLineOfSightClear(currentPos, waypoint))
+                {
+                    _debugLog($"PATHFINDING: Path validation failed at waypoint {waypoint}");
+                    return false;
+                }
+                currentPos = waypoint;
+            }
+            
+            // Check path from last waypoint to target
+            if (!IsDirectLineOfSightClear(currentPos, target))
+            {
+                _debugLog($"PATHFINDING: Path validation failed from last waypoint to target");
+                return false;
+            }
+            
+            _debugLog($"PATHFINDING: Path validation successful");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"ValidateWaypointPath error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Fallback: Generate simple angle-based waypoints (improved version of old logic)
+    /// </summary>  
+    private List<Vector3> GenerateSimpleAngleWaypoints(Vector3 start, Vector3 target)
+    {
+        try
+        {
+            var direction = Vector3.Normalize(target - start);
+            var distance = Vector3.Distance(start, target);
+            
+            // Try more angles and larger waypoint distances
+            var angles = new float[] { -90f, -45f, -30f, 30f, 45f, 90f, 135f, -135f };
+            var waypointDistance = Math.Min(150f, distance * 0.7f);
+            
+            foreach (var angle in angles)
+            {
+                var waypointDirection = RotateVector(direction, angle);
+                var waypoint = start + (waypointDirection * waypointDistance);
+                
+                if (IsBasicallySafe(waypoint) && 
+                    IsDirectLineOfSightClear(start, waypoint) &&
+                    IsDirectLineOfSightClear(waypoint, target))
+                {
+                    _debugLog($"PATHFINDING: Simple angle waypoint found at {angle}° - {waypoint}");
+                    return new List<Vector3> { waypoint };
+                }
+            }
+            
+            _debugLog($"PATHFINDING: No simple angle waypoints found");
+            return new List<Vector3>();
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"GenerateSimpleAngleWaypoints error: {ex.Message}");
             return new List<Vector3>();
         }
     }
