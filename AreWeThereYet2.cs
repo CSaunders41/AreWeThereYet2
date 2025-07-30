@@ -13,7 +13,6 @@ using ImGuiNET;
 using static ImGuiNET.ImGuiCond;
 using static ImGuiNET.ImGuiWindowFlags;
 using static ImGuiNET.ImGuiCol;
-using static ImGuiNET.ImGuiChildFlags;
 
 namespace AreWeThereYet2;
 
@@ -295,7 +294,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             
             if (ImGui.Begin("AreWeThereYet2 Status", 
                 NoCollapse | 
-                AlwaysAutoResize |
+                ImGuiNET.ImGuiWindowFlags.AlwaysAutoResize |
                 NoScrollbar))
             {
                 // Follow Status
@@ -370,7 +369,7 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                     ImGui.TextColored(new System.Numerics.Vector4(1, 1, 0, 1), "DEBUG LOG:");
                     
                     // Show recent debug messages in a scrollable region
-                    if (ImGui.BeginChild("DebugLog", new System.Numerics.Vector2(0, 100), Border))
+                    if (ImGui.BeginChild("DebugLog", new System.Numerics.Vector2(0, 100), ImGuiNET.ImGuiChildFlags.Border))
                     {
                         // Show last 10 debug messages (newest first)
                         var recentMessages = _debugLog.TakeLast(10).Reverse().ToList();
