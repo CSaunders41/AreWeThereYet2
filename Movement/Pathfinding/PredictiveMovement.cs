@@ -24,6 +24,11 @@ public class PredictiveMovement : IPathfinding
     private DateTime _lastUpdate = DateTime.MinValue;
     private Vector3 _lastPredictedPosition = Vector3.Zero;
     
+    // Direct Leader Detection - EXPERIMENT 5
+    private Entity _currentLeader = null;
+    private DateTime _lastLeaderUpdate = DateTime.MinValue;
+    private Vector3 _lastKnownLeaderPos = Vector3.Zero;
+    
     // Movement constants - Aggressive like original AreWeThereYet
     private const float MinStepSize = 80f;           // Never take tiny steps that cause stuck scenarios
     private const float StandardStepSize = 120f;    // Default large step size
@@ -31,6 +36,11 @@ public class PredictiveMovement : IPathfinding
     private const float PredictionTime = 2.0f;      // Predict 2 seconds ahead
     private const int MaxHistorySize = 10;          // Keep last 10 positions for analysis
     private const float AvoidanceAngle = 30f;       // Simple left/right avoidance
+    
+    // Direct Leader Clicking constants - EXPERIMENT 5
+    private const float DirectClickRange = 200f;    // Range for direct leader clicking
+    private const float LeaderDetectionRange = 1500f; // Maximum range to detect leader
+    private const float MaxLeaderAge = 5.0f;        // Max seconds since last leader update
     
     public PredictiveMovement(GameController gameController, Action<string> debugLog)
     {
@@ -440,7 +450,109 @@ public class PredictiveMovement : IPathfinding
     private class LeaderSnapshot
     {
         public Vector3 Position { get; set; }
-        public DateTime Timestamp { get; set;         }
+        public DateTime Timestamp { get; set; }
+    }
+    
+    /// <summary>
+    /// EXPERIMENT 5: Leader detection result from ExileCore memory
+    /// </summary>
+    private class LeaderDetectionResult
+    {
+        public bool Found { get; set; }
+        public Vector3 Position { get; set; }
+        public float Distance { get; set; }
+        public bool InDirectClickRange { get; set; }
+        public Entity Entity { get; set; }
+    }
+    
+    /// <summary>
+    /// EXPERIMENT 5: Detect leader from ExileCore memory - smart leader detection
+    /// </summary>
+    private LeaderDetectionResult DetectLeaderFromMemory(Vector3 currentPos)
+    {
+        try
+        {
+            var player = _gameController?.Player;
+            if (player == null)
+                return new LeaderDetectionResult { Found = false };
+
+            var entities = _gameController?.EntityListWrapper?.Entities;
+            if (entities == null)
+                return new LeaderDetectionResult { Found = false };
+
+            // Look for party leader or nearest player entity
+            Entity bestLeaderCandidate = null;
+            float closestDistance = float.MaxValue;
+            
+            foreach (var entity in entities)
+            {
+                if (entity == null || !entity.IsValid) continue;
+                
+                // Check if this is a player entity (potential leader)
+                var playerComponent = entity.GetComponent<Player>();
+                if (playerComponent == null) continue;
+                
+                // Skip self
+                if (entity.Id == player.Id) continue;
+                
+                var entityPos = entity.Pos;
+                var distance = Vector3.Distance(currentPos, entityPos);
+                
+                // Must be within detection range
+                if (distance > LeaderDetectionRange) continue;
+                
+                // Prefer closer entities as leader candidates
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    bestLeaderCandidate = entity;
+                }
+            }
+            
+            if (bestLeaderCandidate != null)
+            {
+                var leaderPos = bestLeaderCandidate.Pos;
+                var distance = Vector3.Distance(currentPos, leaderPos);
+                
+                // Update leader tracking
+                _currentLeader = bestLeaderCandidate;
+                _lastLeaderUpdate = DateTime.UtcNow;
+                _lastKnownLeaderPos = leaderPos;
+                
+                return new LeaderDetectionResult
+                {
+                    Found = true,
+                    Position = leaderPos,
+                    Distance = distance,
+                    InDirectClickRange = distance <= DirectClickRange,
+                    Entity = bestLeaderCandidate
+                };
+            }
+            
+            // Check if we have recent leader data (within age limit)
+            var timeSinceLastUpdate = (DateTime.UtcNow - _lastLeaderUpdate).TotalSeconds;
+            if (_currentLeader != null && timeSinceLastUpdate <= MaxLeaderAge)
+            {
+                var distance = Vector3.Distance(currentPos, _lastKnownLeaderPos);
+                _debugLog($"USING CACHED LEADER: Age {timeSinceLastUpdate:F1}s, Distance {distance:F1}");
+                
+                return new LeaderDetectionResult
+                {
+                    Found = true,
+                    Position = _lastKnownLeaderPos,
+                    Distance = distance,
+                    InDirectClickRange = distance <= DirectClickRange,
+                    Entity = _currentLeader
+                };
+            }
+            
+            return new LeaderDetectionResult { Found = false };
+        }
+        catch (Exception ex)
+        {
+            _debugLog($"DetectLeaderFromMemory error: {ex.Message}");
+            return new LeaderDetectionResult { Found = false };
+        }
     }
     
     /// <summary>
