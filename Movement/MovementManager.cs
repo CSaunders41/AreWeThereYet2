@@ -237,19 +237,34 @@ public class MovementManager : IDisposable
         {
             var player = _gameController?.Player;
             if (player == null)
+            {
+                _errorManager.HandleError("MovementManager.Debug", new Exception("ExecuteMovementToPosition: Player is NULL"));
                 return false;
+            }
 
             var currentPos = player.Pos;
             var distance = CalculateDistance(currentPos, targetPosition);
+            var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
+
+            _errorManager.HandleError("MovementManager.Debug", 
+                new Exception($"TASK EXECUTING: CurrentDistance={distance:F1}, Threshold={followDistance:F1}"));
 
             // If we're close enough, consider the task complete
-            var followDistance = _settings?.MaxFollowDistance?.Value ?? DefaultFollowDistance;
             if (distance <= followDistance)
+            {
+                _errorManager.HandleError("MovementManager.Debug", 
+                    new Exception($"TASK SUCCESS: Close enough! {distance:F1} <= {followDistance:F1}"));
                 return true;
+            }
 
             // TODO: In Phase 2, we'll integrate with AreWeThereYet's pathfinding
             // For now, we'll use basic mouse movement simulation
-            return ExecuteBasicMovement(targetPosition);
+            bool moveResult = ExecuteBasicMovement(targetPosition);
+            
+            _errorManager.HandleError("MovementManager.Debug", 
+                new Exception($"TASK MOVEMENT: ExecuteBasicMovement returned {moveResult}"));
+                
+            return moveResult;
         }
         catch (Exception ex)
         {
@@ -266,21 +281,27 @@ public class MovementManager : IDisposable
         try
         {
             // PLACEHOLDER: This is where we'll integrate AreWeThereYet's superior pathfinding
-            // For Phase 1, we'll return true to simulate movement
-            // This prevents infinite task creation while we implement proper pathfinding
             
-            // Log the movement attempt for debugging
             var player = _gameController?.Player;
-            if (player != null)
-            {
-                var currentPos = player.Pos;
-                var distance = CalculateDistance(currentPos, targetPosition);
-                
-                // Consider movement successful if we're reasonably close
-                // In real implementation, this would trigger actual pathfinding
-                return distance < MaxFollowDistance;
-            }
+            if (player == null)
+                return false;
 
+            var currentPos = player.Pos;
+            var distance = CalculateDistance(currentPos, targetPosition);
+            
+            _errorManager.HandleError("MovementManager.Debug", 
+                new Exception($"BASIC MOVEMENT: Distance={distance:F1}, Target={targetPosition}"));
+            
+            // TEMPORARY FIX FOR THRASHING: Return false to keep task "in progress"
+            // This prevents the rapid create->complete->create cycle
+            // Task will stay active showing "Follow Leader" instead of flashing
+            
+            // In real implementation, this would:
+            // 1. Trigger actual pathfinding/movement
+            // 2. Return false while moving (in progress)  
+            // 3. Return true when close enough (complete)
+            
+            // For Phase 0 testing: Always return false (keeps task alive)
             return false;
         }
         catch (Exception ex)
