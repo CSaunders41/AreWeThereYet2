@@ -39,7 +39,7 @@ public class AdvancedLineOfSight : IPathfinding
     }
 
     /// <summary>
-    /// Find optimal path using advanced terrain analysis and raycast pathfinding
+    /// Find optimal path - FIXED: Direct movement when leader is far, waypoints only when needed
     /// </summary>
     public PathfindingResult FindPath(Vector3 start, Vector3 target)
     {
@@ -52,36 +52,51 @@ public class AdvancedLineOfSight : IPathfinding
             var distance = Vector3.Distance(start, target);
             _debugLog($"ADVANCED: Finding path, distance: {distance:F1}");
             
-            // Phase 1: Direct line-of-sight check with raycast
-            if (distance <= MaxDirectPathDistance && IsDirectLineOfSightClear(start, target))
+            // FIXED: Always try direct path first, regardless of distance when leader is far
+            if (IsDirectLineOfSightClear(start, target))
             {
                 result.Success = true;
                 result.Path = new List<Vector3> { start, target };
                 result.SimplifiedPath = new List<Vector3> { target };
                 result.Distance = distance;
                 
-                _debugLog($"ADVANCED: Direct line-of-sight path found: {distance:F1} units");
+                _debugLog($"ADVANCED: DIRECT PATH - No waypoints needed, moving directly to leader: {distance:F1} units");
                 return result;
             }
             
-            // Phase 2: Advanced waypoint pathfinding with terrain analysis
-            var waypoints = FindOptimalWaypoints(start, target);
-            if (waypoints.Count > 0)
+            // FIXED: Only use waypoints when direct path is blocked AND distance is reasonable
+            if (distance <= MaxDirectPathDistance)
+            {
+                var waypoints = FindOptimalWaypoints(start, target);
+                if (waypoints.Count > 0)
+                {
+                    result.Success = true;
+                    result.Path = new List<Vector3> { start };
+                    result.Path.AddRange(waypoints);
+                    result.Path.Add(target);
+                    result.SimplifiedPath = new List<Vector3>(waypoints) { target };
+                    
+                    // Calculate total path distance
+                    result.Distance = 0f;
+                    for (int i = 0; i < result.Path.Count - 1; i++)
+                    {
+                        result.Distance += Vector3.Distance(result.Path[i], result.Path[i + 1]);
+                    }
+                    
+                    _debugLog($"ADVANCED: Waypoint path found: {waypoints.Count} waypoints, {result.Distance:F1} total distance");
+                    return result;
+                }
+            }
+            
+            // FIXED: For very far leaders, force direct movement even if line-of-sight isn't perfect
+            if (distance > MaxDirectPathDistance)
             {
                 result.Success = true;
-                result.Path = new List<Vector3> { start };
-                result.Path.AddRange(waypoints);
-                result.Path.Add(target);
-                result.SimplifiedPath = new List<Vector3>(waypoints) { target };
+                result.Path = new List<Vector3> { start, target };
+                result.SimplifiedPath = new List<Vector3> { target };
+                result.Distance = distance;
                 
-                // Calculate total path distance
-                result.Distance = 0f;
-                for (int i = 0; i < result.Path.Count - 1; i++)
-                {
-                    result.Distance += Vector3.Distance(result.Path[i], result.Path[i + 1]);
-                }
-                
-                _debugLog($"ADVANCED: Waypoint path found: {waypoints.Count} waypoints, {result.Distance:F1} total distance");
+                _debugLog($"ADVANCED: FORCED DIRECT - Leader very far ({distance:F1}), skipping waypoints");
                 return result;
             }
             

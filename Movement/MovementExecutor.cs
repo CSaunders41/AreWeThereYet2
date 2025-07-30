@@ -84,7 +84,9 @@ public class MovementExecutor : IDisposable
                     return false; // Can't find path - task fails
                 }
 
-                _debugLog($"MOVEMENT: Path found with {_currentPath.SimplifiedPath.Count} waypoints");
+                // FIXED: Check if this is a direct path (no waypoints needed)
+                var isDirectPath = _currentPath.SimplifiedPath.Count == 1;
+                _debugLog($"MOVEMENT: Path found - {(_currentPath.SimplifiedPath.Count)} waypoints, Direct: {isDirectPath}");
             }
 
             // Execute movement along path
@@ -118,7 +120,7 @@ public class MovementExecutor : IDisposable
     }
 
     /// <summary>
-    /// Execute the next movement step along the current path
+    /// Execute the next movement step - FIXED: Direct movement for far leaders, waypoints only when needed
     /// </summary>
     private async Task<bool> ExecuteNextMovementStep(Vector3 currentPos)
     {
@@ -127,10 +129,43 @@ public class MovementExecutor : IDisposable
             if (_currentPath?.SimplifiedPath == null || _currentPath.SimplifiedPath.Count == 0)
                 return false;
 
-            // Get current waypoint target
+            // FIXED: Check if this is a direct path (only one target, no waypoints)
+            var isDirectPath = _currentPath.SimplifiedPath.Count == 1;
+            var finalTarget = _currentPath.SimplifiedPath[_currentPath.SimplifiedPath.Count - 1];
+            var totalDistance = Vector3.Distance(currentPos, finalTarget);
+
+            if (isDirectPath && totalDistance > 100f)
+            {
+                // DIRECT MOVEMENT: No waypoints, move directly toward leader with big steps
+                var nextPoint = _pathfinding.GetNextMovePoint(currentPos, finalTarget);
+                if (nextPoint.HasValue)
+                {
+                    var screenPos = Mouse.WorldToScreen(nextPoint.Value, _gameController);
+                    if (screenPos != Vector2.Zero)
+                    {
+                        var stepDistance = Vector3.Distance(currentPos, nextPoint.Value);
+                        _debugLog($"MOVEMENT: DIRECT STEP to leader - {stepDistance:F1} units toward {finalTarget}");
+                        await Mouse.ClickAt(screenPos, 150); // Faster movement for direct paths
+                        return true;
+                    }
+                }
+                
+                // Fallback: move directly to target
+                var directScreenPos = Mouse.WorldToScreen(finalTarget, _gameController);
+                if (directScreenPos != Vector2.Zero)
+                {
+                    _debugLog($"MOVEMENT: DIRECT CLICK on leader position - {totalDistance:F1} units");
+                    await Mouse.ClickAt(directScreenPos, 150);
+                    return true;
+                }
+                
+                return false;
+            }
+
+            // WAYPOINT MOVEMENT: Use traditional waypoint system for complex paths
             if (_currentPathIndex >= _currentPath.SimplifiedPath.Count)
             {
-                _debugLog("MOVEMENT: Reached end of path");
+                _debugLog("MOVEMENT: Reached end of waypoint path");
                 _currentPath = null; // Path completed
                 return false;
             }
@@ -139,7 +174,6 @@ public class MovementExecutor : IDisposable
             var distanceToWaypoint = Vector3.Distance(currentPos, targetWaypoint);
 
             // Check if we've reached current waypoint - FIXED: Dynamic threshold based on total distance
-            var totalDistance = Vector3.Distance(_gameController.Player.Pos, _currentPath.SimplifiedPath[_currentPath.SimplifiedPath.Count - 1]);
             var dynamicThreshold = totalDistance > 200f ? WaypointThreshold * 1.5f : WaypointThreshold;
             
             if (distanceToWaypoint <= dynamicThreshold)
@@ -158,7 +192,7 @@ public class MovementExecutor : IDisposable
             }
 
             // Execute mouse movement and click
-            _debugLog($"MOVEMENT: Moving mouse to {screenPos} (world: {targetWaypoint})");
+            _debugLog($"MOVEMENT: WAYPOINT CLICK to {screenPos} (world: {targetWaypoint})");
             await Mouse.ClickAt(screenPos, 200); // 200ms movement duration
 
             return true; // Movement command executed
@@ -212,7 +246,7 @@ public class MovementExecutor : IDisposable
     }
 
     /// <summary>
-    /// Get movement status for debugging
+    /// Get movement status for debugging - FIXED: Shows direct vs waypoint movement
     /// </summary>
     public string GetMovementStatus()
     {
@@ -222,7 +256,15 @@ public class MovementExecutor : IDisposable
         if (_currentPath.SimplifiedPath.Count == 0)
             return "Empty path";
 
-        return $"Path: {_currentPathIndex + 1}/{_currentPath.SimplifiedPath.Count} waypoints";
+        var isDirectPath = _currentPath.SimplifiedPath.Count == 1;
+        if (isDirectPath)
+        {
+            return "Direct movement to leader (no waypoints)";
+        }
+        else
+        {
+            return $"Waypoint path: {_currentPathIndex + 1}/{_currentPath.SimplifiedPath.Count} waypoints";
+        }
     }
 
     /// <summary>
