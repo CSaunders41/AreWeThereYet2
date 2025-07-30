@@ -47,11 +47,11 @@ public class MovementManager : IDisposable
         _debugLog = debugLog;
         _lastMovementCheck = DateTime.MinValue;
         
-        // Initialize Phase 2.1 Advanced LineOfSight pathfinding and movement systems
-        _pathfinding = new AdvancedLineOfSight(gameController, debugLog);
+        // Initialize Phase 1: Predictive Movement System - Smart leader anticipation
+        _pathfinding = new PredictiveMovement(gameController, debugLog);
         _movementExecutor = new MovementExecutor(gameController, _pathfinding, debugLog, settings);
         
-        debugLog("PHASE 2.1: Advanced LineOfSight pathfinding and movement systems initialized");
+        debugLog("PHASE 1: Predictive Movement System initialized - Smart leader tracking enabled");
     }
 
     /// <summary>
@@ -249,19 +249,19 @@ public class MovementManager : IDisposable
     }
 
     /// <summary>
-    /// Execute movement to a specific position using ADVANCED LineOfSight pathfinding and mouse movement
-    /// Phase 2.1: This now uses advanced terrain detection, raycast pathfinding, and intelligent obstacle avoidance
+    /// Execute movement to a specific position using PREDICTIVE pathfinding and mouse movement
+    /// Phase 1: This now uses predictive leader tracking with large aggressive steps for superior following
     /// </summary>
     private async Task<bool> ExecuteMovementToPosition(Vector3 targetPosition)
     {
         try
         {
-            _debugLog("PHASE 2.1: Executing ADVANCED movement with LineOfSight pathfinding");
+            _debugLog("PHASE 1: Executing PREDICTIVE movement with leader anticipation");
             
-            // Use the new MovementExecutor with AdvancedLineOfSight for superior pathfinding
+            // Use the MovementExecutor with PredictiveMovement for intelligent following
             var result = await _movementExecutor.ExecuteMovementToPosition(targetPosition);
             
-            _debugLog($"ADVANCED MOVEMENT RESULT: {result}");
+            _debugLog($"PREDICTIVE MOVEMENT RESULT: {result}");
             return result;
         }
         catch (Exception ex)
@@ -379,9 +379,9 @@ public class MovementManager : IDisposable
             // Cancel any active movement tasks
             _taskManager?.RemoveTask("follow_leader");
             
-            // Dispose Phase 2.1 Advanced LineOfSight movement systems
+            // Dispose Phase 1 Predictive Movement System
             _movementExecutor?.Dispose();
-            _debugLog("PHASE 2.1: Advanced LineOfSight movement systems disposed");
+            _debugLog("PHASE 1: Predictive Movement System disposed");
         }
         catch (Exception ex)
         {

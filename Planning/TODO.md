@@ -1,11 +1,18 @@
 # AreWeThereYet2 Development TODO
+## Focused Predictive Movement System
 
-## Phase 0: Proof of Concept (2-3 days)
-*Validate core concepts before full Phase 1 implementation*
+**Goal**: Replace over-engineered pathfinding with smart, predictive movement that anticipates leader behavior.
 
-### 🚀 Core Infrastructure Setup
+**Key Insight**: The original AreWeThereYet's superiority comes from large movement steps + predictive positioning, not complex pathfinding.
+
+---
+
+## Phase 0: Foundation Complete ✅
+*Validate existing architecture before proceeding*
+
+### 🚀 Core Infrastructure (COMPLETE)
 - [x] **Project Structure Setup**
-  - [x] Create basic folder structure (`Core/`, `Movement/`, `Utils/`, etc.)
+  - [x] Create folder structure (`Core/`, `Movement/`, `Utils/`, etc.)
   - [x] Set up `.csproj` file with ExileCore references
   - [x] Create basic `AreWeThereYet2.cs` plugin shell
   - [x] Add required using statements and namespaces
@@ -24,162 +31,195 @@
   - [x] Add auto-leader identification logic
   - [x] Test with party and solo scenarios
 
-- [ ] **ExileCore API Integration Validation**
-  - [ ] Verify `GameController.EntityListWrapper` access
-  - [ ] Test `IngameState` integration
-  - [ ] Validate settings system compatibility
-  - [ ] Confirm coroutine system usage
-  - [ ] Test basic plugin lifecycle (Enable/Disable/Update)
-
-### 🧪 Phase 0 Testing & Validation
+### 🧪 Phase 0 Final Validation
 **⚠️ Testing Workflow**: Development on macOS, testing on Windows machine with ExileCore. All changes must be pushed to GitHub for testing.
 
-- [ ] **Basic Functionality Test**
-  - [ ] Plugin loads without errors
-  - [ ] Settings panel appears correctly
-  - [ ] TaskManager creates and prioritizes tasks
-  - [ ] PartyManager detects leader correctly
+- [ ] **Final System Test**
+  - [ ] Plugin loads without errors in ExileCore
+  - [ ] TaskManager creates and prioritizes tasks correctly
+  - [ ] PartyManager detects leader accurately
+  - [ ] No performance degradation from baseline
+  - [ ] Clean error-free operation for 10+ minutes
 
-- [ ] **Integration Test**
-  - [ ] Test with existing AreWeThereYet installation
-  - [ ] Verify no conflicts with ExileCore
-  - [ ] Check memory usage baseline
-  - [ ] Validate performance impact
-
-### 📋 Phase 0 Success Criteria
-- [ ] Plugin successfully loads in ExileCore
-- [ ] TaskManager correctly prioritizes different task types
-- [ ] PartyManager auto-detects party leader (or falls back gracefully)
-- [ ] No performance degradation from baseline
-- [ ] Clean error-free operation for 10+ minutes
+**✅ SUCCESS CRITERIA**: If validation passes, proceed to Phase 1. Current system architecture is solid.
 
 ---
 
-## Phase 1: Core Foundation (1-2 weeks)
-*Build upon Phase 0 success*
+## Phase 1: Intelligent Predictive Movement (2-3 weeks)
+*Replace the problematic 1,287-line AdvancedLineOfSight.cs with smart prediction*
 
-### 🛡️ Enhanced Error Handling System
-- [ ] **ErrorManager Implementation**
-  - [ ] Create centralized `ErrorManager` class
-  - [ ] Implement error counting and categorization
-  - [ ] Add circuit breaker patterns for failed operations
-  - [ ] Create diagnostic information collection
-  - [ ] Implement failsafe mechanisms (portal to town, etc.)
+### 🎯 Core Problem Analysis
+**Current Issue**: `AdvancedLineOfSight.cs` is over-engineered (1,287 lines) with:
+- Complex terrain analysis causing performance issues
+- Over-analysis leading to stuck scenarios  
+- Multiple failure points from complex logic
 
-- [ ] **Error Recovery Strategies**
-  - [ ] Define error categories (Network, Pathfinding, Combat, Party, Input)
-  - [ ] Implement per-category escalation paths
-  - [ ] Add circuit breaker thresholds
-  - [ ] Create emergency shutdown procedures
+**Solution**: Replace with focused predictive movement that anticipates leader behavior.
 
-### 🎯 Enhanced Party Leader Detection
-- [ ] **Auto-Detection Improvements**
-  - [ ] Handle leader changes and disconnections
-  - [ ] Implement fallback to manual configuration
-  - [ ] Add leader validation and health checks
-  - [ ] Create party status monitoring
+### 🧠 Predictive Movement System
+- [ ] **Create PredictiveMovement.cs**
+  - [ ] Implement `IPathfinding` interface (maintain compatibility)
+  - [ ] Add leader position history tracking (`Queue<Vector3>`)
+  - [ ] Implement velocity estimation from position history
+  - [ ] Add acceleration detection for turning leaders
+  - [ ] Create physics-based position prediction (2-3 seconds ahead)
 
-### ⚙️ Structured Task Management
-- [ ] **Task System Enhancement**
-  - [ ] Complete priority-based task system
-  - [ ] Implement task lifecycle management
-  - [ ] Add task timeout and retry logic
-  - [ ] Create clear task type separation (Movement, Combat, Portal, Recovery)
+- [ ] **Implement Interception Logic**
+  - [ ] Calculate optimal interception point (where to meet leader)
+  - [ ] Add interception vs. direct following decision logic
+  - [ ] Handle fast-moving vs. slow-moving leader scenarios
+  - [ ] Add fallback to direct following when prediction fails
 
-### 🧪 Phase 1 Testing
-- [ ] **Error Handling Tests**
-  - [ ] Test various error scenarios
-  - [ ] Validate recovery strategies
-  - [ ] Check failsafe mechanisms
+- [ ] **Large Step Movement (Original AreWeThereYet Style)**
+  - [ ] Implement aggressive step sizes (120-180 units)
+  - [ ] Add dynamic step sizing based on distance to predicted position
+  - [ ] Ensure steps are never smaller than 80 units (prevent micro-movements)
+  - [ ] Add direct line preference with minimal safety checks
 
-- [ ] **Party Management Tests**
-  - [ ] Test leader changes
-  - [ ] Validate auto-detection accuracy
-  - [ ] Check fallback mechanisms
+- [ ] **Basic Obstacle Avoidance**
+  - [ ] Implement simple left/right angle avoidance (30-degree attempts)
+  - [ ] Add "basically safe" position checking (minimal entity scanning)
+  - [ ] Remove complex terrain analysis and caching
+  - [ ] Focus on "good enough" obstacle handling
 
----
+### 🔄 Integration & Testing
+- [ ] **Replace Current System**
+  - [ ] Update `MovementManager` to use `PredictiveMovement` instead of `AdvancedLineOfSight`
+  - [ ] Remove or archive `AdvancedLineOfSight.cs` (save complex logic for future reference)
+  - [ ] Maintain existing `MovementExecutor` and `Mouse` utilities
+  - [ ] Keep all existing interfaces for compatibility
 
-## Phase 2: Combat Integration (1 week)
-*Implement combat-aware following*
+- [ ] **Performance Testing**
+  - [ ] Measure performance improvement vs. current system
+  - [ ] Test with various leader movement patterns (walking, running, teleporting)
+  - [ ] Validate stuck event reduction (target: 70% fewer stuck events)
+  - [ ] Test with different follow distances and scenarios
 
-### ⚔️ Combat Distance Management
-- [ ] Create `CombatManager` class
-- [ ] Implement separate follow distances for combat vs non-combat
-- [ ] Add pre-combat positioning logic
-- [ ] Implement combat state detection
-- [ ] Add leashing behavior during fights
+- [ ] **Debug & Refinement**
+  - [ ] Add comprehensive logging for prediction accuracy
+  - [ ] Track leader prediction success rate
+  - [ ] Monitor movement efficiency metrics
+  - [ ] Fine-tune prediction timeframes and step sizes
 
-### 🔧 Robust Failsafe Mechanisms
-- [ ] Multi-level failure detection
-- [ ] Escalating recovery strategies
-- [ ] Stuck detection and recovery
-- [ ] Emergency portal-to-town functionality
-
----
-
-## Phase 3: Party & Travel Enhancement (1-2 weeks)
-*Advanced party and zone management*
-
-### 👥 Advanced Party Management
-- [ ] Auto-join party invitations with whitelist
-- [ ] Party status monitoring and handling
-- [ ] Party member tracking and coordination
-
-### 🌍 Enhanced Zone Travel
-- [ ] Zone-specific portal detection and matching
-- [ ] Multi-zone travel coordination
-- [ ] Portal request system with randomized messages
+### ✅ Phase 1 Success Criteria
+- [ ] **Predictive following works correctly** (anticipates leader movement)
+- [ ] **70% reduction in stuck events** compared to current system
+- [ ] **Performance improvement** (faster pathfinding calculations)
+- [ ] **Large movement steps** prevent micro-movement issues
+- [ ] **Clean, maintainable code** under 300 lines total
 
 ---
 
-## Phase 4: Advanced Features (2-3 weeks)
-*Polish and advanced functionality*
+## Phase 2: Advanced Intelligence (Optional - 2-3 weeks)
+*Add contextual intelligence if Phase 1 is successful*
 
-### ✨ Aura/Buff Management System
-- [ ] Comprehensive aura casting (26+ types from FollowBot)
-- [ ] Golem management with health monitoring
-- [ ] Dynamic skill management
+### 🧠 Context-Aware Strategy Selection
+- [ ] **Movement Context Detection**
+  - [ ] Implement `MovementContext` enum (OpenTerrain, ComplexObstacles, DynamicChasing, TightSpaces)
+  - [ ] Add context analysis logic (obstacle count, leader velocity, distance)
+  - [ ] Create strategy selection based on detected context
+  - [ ] Add context switching with hysteresis (prevent rapid switching)
 
-### 💾 Object Caching System
-- [ ] Monster, chest, shrine caching for performance
-- [ ] Cache lifecycle management
-- [ ] Smart cache invalidation
+- [ ] **Adaptive Learning System**
+  - [ ] Track movement performance metrics (stuck events, efficiency, time-to-target)
+  - [ ] Implement simple learning weights for different contexts
+  - [ ] Add performance-based strategy adjustment
+  - [ ] Store learned patterns for future sessions
+
+### 🚀 Enhanced Pathfinding Options
+- [ ] **Flow Field Integration (for crowd scenarios)**
+  - [ ] Implement basic flow field generation for multiple followers
+  - [ ] Add flow field following when 3+ party members exist
+  - [ ] Integrate with predictive movement for hybrid approach
+
+- [ ] **JPS+ for Tight Spaces**
+  - [ ] Add Jump Point Search Plus for precision navigation
+  - [ ] Use only when context detection identifies tight spaces
+  - [ ] Maintain large-step preference when possible
+
+### ✅ Phase 2 Success Criteria
+- [ ] **Context-aware strategy selection** improves movement in different scenarios
+- [ ] **Learning system** reduces failed movements over time
+- [ ] **Maintains Phase 1 performance** while adding intelligence
+- [ ] **No increase in stuck events** from added complexity
 
 ---
 
-## Development Standards & Guidelines
+## Phase 3: Combat & Formation Enhancement (1-2 weeks)
+*Integrate with combat awareness and formation maintenance*
+
+### ⚔️ Combat-Aware Movement
+- [ ] **Combat Context Detection**
+  - [ ] Detect when leader is in combat vs. traveling
+  - [ ] Adjust following distance based on combat state
+  - [ ] Implement pre-combat positioning logic
+  - [ ] Add leashing behavior during fights
+
+- [ ] **Formation Maintenance**
+  - [ ] Add basic formation positioning relative to leader
+  - [ ] Implement formation adjustment based on terrain
+  - [ ] Add collision avoidance between party members
+  - [ ] Maintain formation while following predictive movement
+
+### 🛡️ Enhanced Safety Systems
+- [ ] **Stuck Detection & Recovery**
+  - [ ] Implement stuck detection with time-based thresholds
+  - [ ] Add automatic unstuck procedures (larger steps, alternative angles)
+  - [ ] Implement emergency recovery (portal to town if critical)
+  - [ ] Add stuck event reporting for learning system
+
+### ✅ Phase 3 Success Criteria
+- [ ] **Combat-aware following** improves tactical positioning
+- [ ] **Formation maintenance** works during complex movement
+- [ ] **Stuck detection** provides reliable recovery mechanisms
+- [ ] **System remains stable** under all combat scenarios
+
+---
+
+## Development Standards
 
 ### 📝 Code Quality
-- [ ] Follow ExileCore plugin patterns and conventions
-- [ ] Use modern C# 12 features and .NET 8.0 capabilities
-- [ ] Implement comprehensive error handling and logging
-- [ ] Include debug visualization where appropriate
-- [ ] Write maintainable, well-documented code
+- **Focus on simplicity**: Each class should have a single, clear purpose
+- **Prefer composition over inheritance**: Use dependency injection for testability
+- **Comprehensive error handling**: Every ExileCore API call should be wrapped
+- **Performance first**: Profile and optimize hot paths
+- **Maintainable architecture**: Code should be easy to understand and modify
 
 ### 🧪 Testing Strategy
-- [ ] Test each phase incrementally before moving to next
-- [ ] Validate against both solo and party gameplay scenarios
-- [ ] Test failsafe mechanisms thoroughly
-- [ ] Verify performance with caching systems
+- **Test each phase incrementally** before moving to the next
+- **Validate on Windows/ExileCore** after each major change
+- **Measure performance impact** of every new feature
+- **Test edge cases**: Leader disconnection, rapid movement, obstacle scenarios
+- **Regression testing**: Ensure new features don't break existing functionality
 
 ### ⚙️ Configuration Philosophy
-- [ ] Provide sensible defaults that work out-of-the-box
-- [ ] Allow granular customization for advanced users
-- [ ] Maintain backward compatibility where possible
-- [ ] Use ExileCore's settings validation patterns
+- **Sensible defaults** that work out-of-the-box
+- **Minimal required configuration** for basic functionality
+- **Advanced options** for power users without overwhelming interface
+- **Real-time adjustment** of key parameters for testing
 
 ---
 
 ## Project Status
-- **Current Phase**: Phase 0 - Proof of Concept (90% Complete)
-- **Started**: January 2025
-- **Target Completion**: 6-8 weeks total
-- **Next Milestone**: Complete Phase 0 validation testing on Windows/ExileCore
-- **GitHub Repository**: https://github.com/CSaunders41/AreWeThereYet2
-- **Latest Commit**: Phase 0 Implementation - Core infrastructure complete
 
-## Notes
-- Keep AreWeThereYet's superior movement system and pathfinding
-- Adapt FollowBot's concepts to ExileCore APIs (don't copy directly)
-- Test frequently with incremental changes
-- Focus on reliability and error handling from the start
+- **Current Phase**: Phase 0 Complete → Starting Phase 1
+- **Started**: January 2025
+- **Target Completion**: 6-8 weeks total (3-4 weeks remaining)
+- **Next Milestone**: Complete Phase 1 - Predictive Movement System
+- **GitHub Repository**: https://github.com/CSaunders41/AreWeThereYet2
+- **Development Approach**: Iterative development with frequent testing
+
+## Key Decisions Made
+
+- **Architecture**: Keep existing TaskManager, PartyManager, ErrorManager (they work well)
+- **Pathfinding Strategy**: Replace complex analysis with predictive intelligence
+- **Movement Style**: Large aggressive steps like original AreWeThereYet
+- **Scope**: Focus on core following behavior, add complexity only if Phase 1 succeeds
+- **Performance**: Prioritize responsiveness over algorithmic complexity
+
+## Success Metrics
+
+- **Primary**: 70% reduction in stuck events compared to current system
+- **Secondary**: Faster pathfinding calculations (< 50ms per decision)
+- **Tertiary**: Improved leader following (anticipatory vs. reactive movement)
+- **Code Quality**: Maintainable, understandable, under 500 lines for core pathfinding
