@@ -73,6 +73,13 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
             {
                 LogMessage($"[DEBUG] {message}", 1);
             }
+            
+            // TEMPORARY: Also force to error system so user can see messages are working
+            // This helps troubleshoot the debug system
+            if (Settings?.DebugMode?.Value == true)
+            {
+                _errorManager?.HandleError("DEBUG", new Exception(message));
+            }
         }
         catch
         {
@@ -360,6 +367,32 @@ public class AreWeThereYet2 : BaseSettingsPlugin<AreWeThereYet2Settings>
                 if (errorCount > 0)
                 {
                     ImGui.TextColored(new System.Numerics.Vector4(1, 0, 0, 1), $"Errors: {errorCount}");
+                }
+                
+                // Always show debug message count and latest message
+                ImGui.TextColored(new System.Numerics.Vector4(0.8f, 0.8f, 1, 1), $"Debug Messages: {_debugLog.Count}");
+                if (_debugLog.Count > 0)
+                {
+                    var latestMessage = _debugLog.LastOrDefault();
+                    if (!string.IsNullOrEmpty(latestMessage))
+                    {
+                        // Show just the message part (without timestamp) and truncate if too long
+                        var messagePart = latestMessage.Contains("] ") ? 
+                            latestMessage.Substring(latestMessage.IndexOf("] ") + 2) : latestMessage;
+                        if (messagePart.Length > 50)
+                            messagePart = messagePart.Substring(0, 47) + "...";
+                        ImGui.TextColored(new System.Numerics.Vector4(0.7f, 0.7f, 0.7f, 1), $"Latest: {messagePart}");
+                    }
+                }
+                
+                // Quick Debug Mode toggle
+                if (Settings?.DebugMode != null)
+                {
+                    bool debugMode = Settings.DebugMode.Value;
+                    if (ImGui.Checkbox("Debug Mode", ref debugMode))
+                    {
+                        Settings.DebugMode.Value = debugMode;
+                    }
                 }
 
                 // Debug Information
