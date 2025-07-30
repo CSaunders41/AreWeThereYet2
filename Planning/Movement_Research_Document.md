@@ -65,7 +65,99 @@ var player = entity.GetComponent<Player>();
 ✅ **Real-time entity data**  
 ✅ **Accurate world-to-screen conversion**  
 ✅ **Component-based entity information**  
-✅ **Game state detection (InGame, etc.)**  
+✅ **Game state detection (InGame, etc.)**
+
+---
+
+## Research Findings Update (January 2025)
+
+### Web Search Results Analysis
+**Key Finding: ExileCore movement is a niche area with few public examples**
+
+- ❌ **No successful ExileCore movement plugins found** in public repositories
+- ❌ **No comprehensive ExileCore terrain detection APIs** documented
+- ❌ **Limited community knowledge** about proper obstacle detection
+- ✅ **General movement principles** from other game bots show similar patterns
+
+### Current System Diagnostic Issues
+
+#### 1. **Step Size Problems (High Priority)**
+From user reports: "clicking very close to the player character"
+- **Suspected Issue**: `distance * 0.6f` for close targets creates micro-movements
+- **Investigation**: Added enhanced logging to track step size decisions
+- **Need**: Test with distances 50-150 units to verify calculation
+
+#### 2. **Obstacle Detection Too Aggressive (High Priority)**  
+From user reports: "still getting stuck on corners"
+- **Suspected Issue**: `HasMajorObstacleAt()` flagging too many false positives
+- **Investigation**: May need to reduce `obstacleRadius` from 35f to 15-20f
+- **Need**: Test obstacle detection sensitivity
+
+#### 3. **ExileCore Memory Usage (Unknown)**
+- **Current Approach**: Using `EntityListWrapper.Entities` for obstacle detection
+- **Uncertainty**: Don't know if this is the correct/optimal API
+- **Research Gap**: No examples of successful ExileCore terrain detection
+
+### Experimental Approaches to Test
+
+#### **Experiment 1: Step Size Override** (Quick Test)
+```csharp
+// Force minimum step sizes to prevent micro-movements
+private float CalculateAggressiveStepSize(float distance)
+{
+    // EXPERIMENT: Always use large steps, ignore distance
+    if (distance > 300f) return 180f;  // Aggressive
+    if (distance > 100f) return 120f;  // Standard  
+    return 100f; // FORCE large minimum instead of distance * 0.6f
+}
+```
+
+#### **Experiment 2: Obstacle Detection Sensitivity** (Quick Test)
+```csharp
+// Reduce obstacle detection radius and be more selective
+private bool HasMajorObstacleAt(Vector3 position)
+{
+    const float obstacleRadius = 15f; // REDUCED from 35f
+    // Only block for EntityType.WorldItem with specific names
+    // Skip monsters unless they're bosses AND stationary
+}
+```
+
+#### **Experiment 3: Bypass Obstacle Detection** (Diagnostic Test)
+```csharp
+// Temporarily disable obstacle detection to test pure step sizes
+public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
+{
+    // EXPERIMENT: Skip all obstacle detection
+    var direction = Vector3.Normalize(targetPos - currentPos);
+    var stepSize = CalculateAggressiveStepSize(distance);
+    return currentPos + (direction * stepSize);
+}
+```
+
+#### **Experiment 4: Original AreWeThereYet Emulation** (If other experiments fail)
+```csharp
+// Emulate exactly what original AreWeThereYet did
+public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
+{
+    var distance = Vector3.Distance(currentPos, targetPos);
+    var direction = Vector3.Normalize(targetPos - currentPos);
+    
+    // Fixed 120-unit steps, only basic safety checks
+    float stepSize = Math.Min(120f, distance);
+    var nextPoint = currentPos + (direction * stepSize);
+    
+    // Only avoid if height difference > 150f
+    var heightDiff = Math.Abs(nextPoint.Z - currentPos.Z);
+    if (heightDiff > 150f) {
+        // Try 90-degree left/right
+        var leftPoint = currentPos + (RotateVector2D(direction, 90f) * stepSize);
+        return leftPoint;
+    }
+    
+    return nextPoint;
+}
+```  
 ✅ **Entity type filtering (Monster, Player, etc.)**
 
 ---
