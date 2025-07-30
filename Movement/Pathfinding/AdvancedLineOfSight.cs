@@ -137,7 +137,7 @@ public class AdvancedLineOfSight : IPathfinding
 
     /// <summary>
     /// Get next movement point with intelligent obstacle avoidance
-    /// Fixed: More aggressive movement when leader is far away
+    /// Fixed: More aggressive movement when leader is far away - ALWAYS returns a valid point
     /// </summary>
     public Vector3? GetNextMovePoint(Vector3 currentPos, Vector3 targetPos)
     {
@@ -154,24 +154,45 @@ public class AdvancedLineOfSight : IPathfinding
             var direction = Vector3.Normalize(targetPos - currentPos);
             var candidatePoint = currentPos + (direction * stepSize);
             
-            _debugLog($"MOVEMENT STEP: Distance={distance:F1}, StepSize={stepSize:F1}, Target={targetPos}");
+            _debugLog($"MOVEMENT STEP: Distance={distance:F1}, StepSize={stepSize:F1}, CandidatePoint={candidatePoint}");
             
-            // Check if candidate point is safe
+            // For direct movement mode, be less restrictive about "safety"
+            // When leader is far, prioritize movement over perfect safety
+            if (distance > 150f)
+            {
+                _debugLog($"MOVEMENT: Leader far ({distance:F1}), using aggressive step - {stepSize:F1} units");
+                return candidatePoint; // Always take the big step when leader is far
+            }
+            
+            // Check if candidate point is safe for closer movements
             if (IsPositionSafe(candidatePoint))
                 return candidatePoint;
             
             // Try intelligent variations around obstacles
-            return FindSafeAlternativePoint(currentPos, direction, stepSize);
+            var alternativePoint = FindSafeAlternativePoint(currentPos, direction, stepSize);
+            if (alternativePoint.HasValue)
+                return alternativePoint;
+            
+            // FALLBACK: If nothing else works, take a smaller but guaranteed step
+            var conservativeStep = Math.Min(stepSize * 0.5f, 75f);
+            var fallbackPoint = currentPos + (direction * conservativeStep);
+            _debugLog($"MOVEMENT: Using fallback step - {conservativeStep:F1} units toward leader");
+            return fallbackPoint;
         }
         catch (Exception ex)
         {
             _debugLog($"ADVANCED GetNextMovePoint error: {ex.Message}");
-            return null;
+            // Even on error, return a basic step toward target
+            var distance = Vector3.Distance(currentPos, targetPos);
+            var direction = Vector3.Normalize(targetPos - currentPos);
+            var basicStep = Math.Min(60f, distance * 0.4f);
+            return currentPos + (direction * basicStep);
         }
     }
 
     /// <summary>
     /// Advanced walkability check - simplified for Phase 2.1 to prevent pathfinding issues
+    /// VERY permissive for aggressive movement when leader is far
     /// </summary>
     public bool IsWalkable(Vector3 position)
     {
@@ -184,23 +205,22 @@ public class AdvancedLineOfSight : IPathfinding
             var currentPos = player.Pos;
             var distance = Vector3.Distance(currentPos, position);
             
-            // Very basic checks to avoid obvious bad positions
-            // Distance check - don't try to walk too far at once
-            if (distance > 1000f)
+            // FIXED: Much more permissive distance check for aggressive following
+            if (distance > 2000f) // Increased from 1000f
             {
                 _debugLog($"IsWalkable: Position too far ({distance:F1} units)");
                 return false;
             }
             
-            // Height difference check - avoid major elevation changes
+            // FIXED: More permissive height check for aggressive following  
             var heightDiff = Math.Abs(position.Z - currentPos.Z);
-            if (heightDiff > 100f)
+            if (heightDiff > 200f) // Increased from 100f
             {
                 _debugLog($"IsWalkable: Height difference too large ({heightDiff:F1} units)");
                 return false;
             }
             
-            // For Phase 2.1, assume most positions are walkable to prevent movement issues
+            // For aggressive movement when leader is far, be very permissive
             return true;
         }
         catch (Exception ex)
