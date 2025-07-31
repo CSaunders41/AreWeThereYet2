@@ -47,11 +47,11 @@ public class MovementManager : IDisposable
         _debugLog = debugLog;
         _lastMovementCheck = DateTime.MinValue;
         
-        // Initialize Phase 1: Predictive Movement System - Smart leader anticipation
-        _pathfinding = new PredictiveMovement(gameController, debugLog);
+        // Initialize BREAKTHROUGH: Game-Integrated Movement System - Works WITH Path of Exile
+        _pathfinding = new GameIntegratedMovement(gameController, debugLog);
         _movementExecutor = new MovementExecutor(gameController, _pathfinding, debugLog, settings);
         
-        debugLog("PHASE 1: Predictive Movement System initialized - Smart leader tracking enabled");
+        debugLog("BREAKTHROUGH: Game-Integrated Movement System initialized - Revolutionary approach!");
     }
 
     /// <summary>
@@ -249,19 +249,19 @@ public class MovementManager : IDisposable
     }
 
     /// <summary>
-    /// Execute movement to a specific position using PREDICTIVE pathfinding and mouse movement
-    /// Phase 1: This now uses predictive leader tracking with large aggressive steps for superior following
+    /// Execute movement to a specific position using GAME-INTEGRATED movement system
+    /// BREAKTHROUGH: This now works WITH Path of Exile's pathfinding instead of against it
     /// </summary>
     private async Task<bool> ExecuteMovementToPosition(Vector3 targetPosition)
     {
         try
         {
-            _debugLog("PHASE 1: Executing PREDICTIVE movement with leader anticipation");
+            _debugLog("BREAKTHROUGH: Executing GAME-INTEGRATED movement with smooth mouse curves");
             
-            // Use the MovementExecutor with PredictiveMovement for intelligent following
+            // Use the MovementExecutor with GameIntegratedMovement for revolutionary following
             var result = await _movementExecutor.ExecuteMovementToPosition(targetPosition);
             
-            _debugLog($"PREDICTIVE MOVEMENT RESULT: {result}");
+            _debugLog($"GAME-INTEGRATED MOVEMENT RESULT: {result}");
             return result;
         }
         catch (Exception ex)
@@ -379,9 +379,9 @@ public class MovementManager : IDisposable
             // Cancel any active movement tasks
             _taskManager?.RemoveTask("follow_leader");
             
-            // Dispose Phase 1 Predictive Movement System
+            // Dispose BREAKTHROUGH Game-Integrated Movement System  
             _movementExecutor?.Dispose();
-            _debugLog("PHASE 1: Predictive Movement System disposed");
+            _debugLog("BREAKTHROUGH: Game-Integrated Movement System disposed");
         }
         catch (Exception ex)
         {

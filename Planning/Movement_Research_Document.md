@@ -99,6 +99,44 @@ var player = entity.GetComponent<Player>();
 - ❌ **We use fixed step sizes** → not leader-responsive
 - ✅ **Original clicks directly on leader** → simple and effective
 
+### BREAKTHROUGH RESEARCH FINDINGS (Critical Discovery)
+
+**Why Original AreWeThereYet is Superior - KEY INSIGHTS:**
+
+#### **1. MISSING: InputHumanizer Integration**
+Research shows successful ExileCore plugins use **InputHumanizer library**:
+- **Human-like mouse movement** with Bézier curves
+- **Natural acceleration/deceleration**  
+- **Smooth steering** instead of direct clicking
+- **Configurable delays** between actions
+
+**OUR CRITICAL MISTAKE**: Using basic `Mouse.LeftClick()` instead of human-like movement curves!
+
+#### **2. Game Integration Strategy**
+**Original Success Pattern**:
+- ✅ **Hover mouse over leader** (constant visual tracking)
+- ✅ **Use game's native pathfinding** (let PoE handle obstacles)  
+- ✅ **High-frequency updates** (every physics tick)
+- ✅ **Human-like curves** (works WITH game systems)
+
+**Our Failed Pattern**:
+- ❌ **Calculate complex waypoints** (over-engineered)
+- ❌ **Sharp direct clicks** (robotic, fights game)
+- ❌ **Infrequent updates** (gets stuck between decisions)
+- ❌ **Fighting game pathfinding** instead of using it
+
+#### **3. The "Smart" Isn't AI - It's INTEGRATION**
+- Original isn't "smarter pathfinding" - it's **better game integration**
+- Uses **Path of Exile's built-in click-to-move** pathfinding
+- **Mouse curves** make it look natural to game systems
+- **Constant updates** provide real-time course correction
+
+#### **4. Why We Can't Replicate Success**
+- **Missing InputHumanizer** - our clicks are too robotic
+- **Over-engineering** - trying to be smarter than the game
+- **Wrong update frequency** - not constant like original
+- **Fighting the game** instead of working with it
+
 ### Current System Diagnostic Issues
 
 #### 1. **Step Size Problems (High Priority)**
